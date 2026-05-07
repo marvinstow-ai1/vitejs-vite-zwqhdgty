@@ -19,6 +19,17 @@ export async function createNotification(toUserId, fromUserId, type, postId = nu
 // ─── Likes ────────────────────────────────────────────────────────────────────
 
 /**
+ * Gibt die aktuelle Like-Anzahl eines Posts zurück.
+ */
+export async function getLikeCount(postId) {
+  const { count } = await supabase
+    .from('likes')
+    .select('*', { count: 'exact', head: true })
+    .eq('post_id', postId)
+  return count ?? 0
+}
+
+/**
  * Toggled einen Like auf einem Post.
  * Gibt { newLiked, error } zurück.
  */

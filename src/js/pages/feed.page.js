@@ -1,8 +1,9 @@
 import { supabase } from '../supabase.js'
 import { shellHtml, wireShellNav, applyNavPref, refreshUnreadBadge } from '../shell.js'
 import { iconSvg, escapeHtml, detectMediaType, renderMediaEl, timeAgo } from '../utils.js'
-import { loadFeedPosts, getVisiblePostIds, loadPostInteractions, loadMoodTags, loadUsernameMap } from '../services/posts.service.js'
-import { toggleLike, addRepost, removeRepost, getOrCreateRepostsBoardId, loadComments, insertComment, createNotification } from '../services/interactions.service.js'
+import { loadFeedPosts, getVisiblePostIds, loadPostInteractions, loadMoodTags, loadUsernameMap, insertPost } from '../services/posts.service.js'
+import { toggleLike, addRepost, removeRepost, getOrCreateRepostsBoardId, loadComments, insertComment, createNotification, getLikeCount } from '../services/interactions.service.js'
+import { getBoardsByUser } from '../services/boards.service.js'
 import { loadNotifications, getUnreadCount, markAllRead, subscribeToNotifications } from '../services/notifications.service.js'
 import { loadStoriesForUser, markStoryViewed, getStoryViewers, deleteStory, uploadStoryFile, insertStory } from '../services/stories.service.js'
 import { searchProfiles } from '../services/profiles.service.js'
@@ -53,16 +54,10 @@ export async function showFeed(profile, ctx) {
 
         <div id="story-bar" style="display:flex;gap:12px;padding:14px 16px;overflow-x:auto;border-bottom:1px solid var(--border);scrollbar-width:none;-webkit-overflow-scrolling:touch;"></div>
 
-        <div style="max-width:560px;margin:0 auto;padding:64px 24px 48px;text-align:center;">
-          <div style="font-size:36px;margin-bottom:14px;">🌱</div>
-          <h2 style="color:#fff;font-size:18px;font-weight:500;margin:0 0 8px;">Willkommen, @${profile.username}</h2>
-          <p style="color:#666;font-size:13px;line-height:1.6;margin:0 0 24px;">
-            Posts und Reposts findest du auf deinem Profil und auf den Profilen, denen du folgst. Hier oben siehst du Stories, Suche und Benachrichtigungen.
-          </p>
-          <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
-            <button id="cta-profile" style="padding:9px 18px;background:#fff;color:#000;border:none;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;">Mein Profil</button>
-            <button id="cta-explore" style="padding:9px 18px;background:transparent;color:#ccc;border:1px solid #2a2a2a;border-radius:8px;font-size:13px;cursor:pointer;">Entdecken</button>
-          </div>
+        <div class="feed-wrap">
+          <div id="feed-active-filter" class="hidden" style="display:flex;align-items:center;gap:8px;padding:8px 4px 12px;color:#888;font-size:12px;"></div>
+          <div id="feed-grid" class="feed-grid"></div>
+          <div id="feed-state" class="feed-state hidden"></div>
         </div>
       </main>
     </div>
@@ -104,8 +99,225 @@ export async function showFeed(profile, ctx) {
     const si = document.querySelector('#search-input'), sd = document.querySelector('#search-dropdown')
     if (si && sd && !si.contains(e.target) && !sd.contains(e.target)) sd.style.display = 'none'
   })
+
+  await loadFeed(profile, navigate)
+}
+
+// ─── Feed loading ─────────────────────────────────────────────────────────────
+
+/**
+ * Lädt den Feed (eigene + gefollowte Posts) und rendert ihn.
+ * Nutzt ausschließlich die Service-Schicht — keine direkten Queries hier.
+ */
+export async function loadFeed(profile, navigate) {
+  const grid = document.querySelector('#feed-grid')
+  const state = document.querySelector('#feed-state')
+  const filterBar = document.querySelector('#feed-active-filter')
+  if (!grid || !state) return
+
+  _renderFilterBar(profile, navigate)
+
+  state.classList.add('hidden')
+  grid.innerHTML = `<div style="grid-column:1/-1;color:#444;font-size:12px;text-align:center;padding:20px;">Lädt…</div>`
+
+  const { data: allPosts, error } = await loadFeedPosts(profile.id, activeMood)
+  if (error) {
+    grid.innerHTML = ''
+    _showState(`Konnte Feed nicht laden: ${error.message}`)
+    return
+  }
+
+  const visibleIds = await getVisiblePostIds(allPosts || [], profile.id)
+  const posts = (allPosts || []).filter(p => visibleIds.has(p.id)).slice(0, 60)
+
+  if (!posts.length) {
+    grid.innerHTML = ''
+    if (activeMood) {
+      _showState(`Keine Posts mit #${activeMood}.`)
+    } else {
+      _showWelcomeState(profile, navigate)
+    }
+    return
+  }
+
+  const userIds = [...new Set(posts.map(p => p.user_id))]
+  const [usernameMap, interactions] = await Promise.all([
+    loadUsernameMap(userIds),
+    loadPostInteractions(posts.map(p => p.id), profile.id),
+  ])
+
+  grid.innerHTML = posts
+    .map(p => _renderFeedCard(p, profile.id, usernameMap, interactions))
+    .join('')
+
+  _wireFeedActions(profile, navigate)
+}
+
+function _showState(html) {
+  const state = document.querySelector('#feed-state')
+  if (!state) return
+  state.classList.remove('hidden')
+  state.innerHTML = html
+}
+
+function _showWelcomeState(profile, navigate) {
+  _showState(`
+    <div style="font-size:30px;margin-bottom:10px;">🌱</div>
+    <p style="color:#ccc;font-size:14px;margin:0 0 6px;">Willkommen, @${profile.username}</p>
+    <p style="color:#666;font-size:12px;margin:0 0 18px;">Folge anderen Profilen oder poste etwas, um deinen Feed zu füllen.</p>
+    <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;">
+      <button id="cta-explore" class="btn btn-primary">Entdecken</button>
+      <button id="cta-profile" class="btn">Mein Profil</button>
+    </div>`)
   document.querySelector('#cta-profile')?.addEventListener('click', () => navigate('/u/' + profile.username))
   document.querySelector('#cta-explore')?.addEventListener('click', () => navigate('/explore'))
+}
+
+function _renderFilterBar(profile, navigate) {
+  const bar = document.querySelector('#feed-active-filter')
+  if (!bar) return
+  if (!activeMood) { bar.classList.add('hidden'); bar.innerHTML = ''; return }
+  bar.classList.remove('hidden')
+  bar.innerHTML = `
+    <span>Filter:</span>
+    <button id="feed-clear-mood" style="display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;border:1px solid #2a2a2a;background:transparent;color:#ddd;font-size:12px;cursor:pointer;">
+      #${activeMood}
+      <span style="opacity:.6;">×</span>
+    </button>`
+  document.querySelector('#feed-clear-mood').addEventListener('click', () => {
+    activeMood = null
+    loadFeed(profile, navigate)
+  })
+}
+
+function _renderFeedCard(post, currentUserId, usernameMap, interactions) {
+  const { likeCounts, userLikedSet, commentCounts, repostCounts, userRepostedSet } = interactions
+  const liked = userLikedSet.has(post.id)
+  const reposted = userRepostedSet.has(post.id)
+  const lc = likeCounts[post.id] || 0
+  const cc = commentCounts[post.id] || 0
+  const rc = repostCounts[post.id] || 0
+  const username = usernameMap[post.user_id] || 'unknown'
+  const mt = post.media_type || detectMediaType(post.media_url)
+  const isEmbed = mt === 'youtube' || mt === 'instagram'
+  const vis = post.visibility || 'public'
+  const isOwn = post.user_id === currentUserId
+  const visBadge = isOwn && vis !== 'public'
+    ? `<div style="position:absolute;top:6px;left:6px;background:rgba(0,0,0,0.65);border-radius:10px;padding:2px 7px;font-size:10px;color:#ccc;">${vis === 'followers' ? '👥' : '🔒'}</div>`
+    : ''
+  return `
+    <div class="feed-card" data-post-id="${post.id}">
+      <div class="post-media-wrap" data-post-id="${post.id}" data-media-url="${escapeHtml(post.media_url)}" data-media-type="${mt}" data-owner-id="${post.user_id}" style="cursor:${isEmbed ? 'default' : 'pointer'};position:relative;">
+        ${renderMediaEl(post.media_url, mt)}
+        ${visBadge}
+      </div>
+      <div class="feed-card-foot">
+        <div class="meta">
+          <span class="username-link" data-username="${username}" style="font-size:12px;color:#777;cursor:pointer;display:block;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">@${username}</span>
+          ${post.mood ? `<span class="mood-tag" data-mood="${post.mood}" style="font-size:11px;color:#555;cursor:pointer;">#${post.mood}</span>` : ''}
+        </div>
+        <div class="actions">
+          <button class="comment-btn" data-post-id="${post.id}" data-media-url="${escapeHtml(post.media_url)}" data-media-type="${mt}" data-owner-id="${post.user_id}" style="display:flex;align-items:center;gap:3px;background:none;border:none;cursor:pointer;color:#555;font-size:12px;padding:4px 6px;border-radius:6px;">
+            <span style="font-size:14px;">💬</span><span class="comment-count" data-post-id="${post.id}">${cc}</span>
+          </button>
+          <button class="repost-btn" data-post-id="${post.id}" data-reposted="${reposted}" data-owner-id="${post.user_id}" style="display:flex;align-items:center;gap:3px;background:none;border:none;cursor:pointer;color:${reposted ? '#06d6a0' : '#555'};font-size:12px;padding:4px 6px;border-radius:6px;">
+            <span style="font-size:14px;">🔁</span><span class="repost-count" data-post-id="${post.id}">${rc}</span>
+          </button>
+          <button class="like-btn" data-post-id="${post.id}" data-liked="${liked}" data-owner-id="${post.user_id}" style="display:flex;align-items:center;gap:3px;background:none;border:none;cursor:pointer;color:${liked ? '#ff4d6d' : '#555'};font-size:12px;padding:4px 6px;border-radius:6px;">
+            <span class="like-icon" style="font-size:15px;">${liked ? '♥' : '♡'}</span><span class="like-count" data-post-id="${post.id}">${lc}</span>
+          </button>
+        </div>
+      </div>
+    </div>`
+}
+
+function _wireFeedActions(profile, navigate) {
+  document.querySelectorAll('#feed-grid .like-btn').forEach(btn =>
+    btn.addEventListener('click', () => _handleLike(btn, profile.id))
+  )
+  document.querySelectorAll('#feed-grid .repost-btn').forEach(btn =>
+    btn.addEventListener('click', () => _handleRepost(btn, profile.id))
+  )
+  document.querySelectorAll('#feed-grid .comment-btn').forEach(btn =>
+    btn.addEventListener('click', () => openCommentsModal(
+      btn.dataset.postId, btn.dataset.mediaUrl, btn.dataset.mediaType, profile.id, btn.dataset.ownerId
+    ))
+  )
+  document.querySelectorAll('#feed-grid .post-media-wrap').forEach(wrap => {
+    if (wrap.dataset.mediaType === 'youtube' || wrap.dataset.mediaType === 'instagram') return
+    wrap.addEventListener('click', () => openCommentsModal(
+      wrap.dataset.postId, wrap.dataset.mediaUrl, wrap.dataset.mediaType, profile.id, wrap.dataset.ownerId
+    ))
+  })
+  document.querySelectorAll('#feed-grid .username-link').forEach(el =>
+    el.addEventListener('click', () => navigate('/u/' + el.dataset.username))
+  )
+  document.querySelectorAll('#feed-grid .mood-tag').forEach(tag =>
+    tag.addEventListener('click', () => {
+      activeMood = tag.dataset.mood
+      loadFeed(profile, navigate)
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    })
+  )
+}
+
+async function _handleLike(btn, currentUserId) {
+  const postId = btn.dataset.postId
+  const liked = btn.dataset.liked === 'true'
+  const ownerId = btn.dataset.ownerId
+  const countEl = btn.querySelector('.like-count')
+  const iconEl = btn.querySelector('.like-icon')
+  const current = parseInt(countEl?.textContent || '0')
+
+  // Optimistic UI
+  btn.dataset.liked = String(!liked)
+  btn.style.color = !liked ? '#ff4d6d' : '#555'
+  if (iconEl) iconEl.textContent = !liked ? '♥' : '♡'
+  if (countEl) countEl.textContent = !liked ? current + 1 : Math.max(0, current - 1)
+
+  const { error } = await toggleLike(postId, currentUserId, liked, ownerId)
+  if (error) {
+    // Rollback
+    btn.dataset.liked = String(liked)
+    btn.style.color = liked ? '#ff4d6d' : '#555'
+    if (iconEl) iconEl.textContent = liked ? '♥' : '♡'
+    if (countEl) countEl.textContent = current
+  }
+}
+
+async function _handleRepost(btn, currentUserId) {
+  const postId = btn.dataset.postId
+  const reposted = btn.dataset.reposted === 'true'
+  const ownerId = btn.dataset.ownerId
+  const countEl = btn.querySelector('.repost-count')
+  const current = parseInt(countEl?.textContent || '0')
+
+  if (reposted) {
+    btn.dataset.reposted = 'false'
+    btn.style.color = '#555'
+    if (countEl) countEl.textContent = Math.max(0, current - 1)
+    const { error } = await removeRepost(postId, currentUserId)
+    if (error) {
+      btn.dataset.reposted = 'true'
+      btn.style.color = '#06d6a0'
+      if (countEl) countEl.textContent = current
+    }
+    return
+  }
+
+  // Open modal so the user can pick a board / decide profile visibility
+  const boards = await getBoardsByUser(currentUserId)
+  openRepostModal(boards, async ({ boardId, showOnProfile }) => {
+    btn.dataset.reposted = 'true'
+    btn.style.color = '#06d6a0'
+    if (countEl) countEl.textContent = current + 1
+    const { error } = await addRepost(postId, currentUserId, ownerId, { boardId, showOnProfile })
+    if (error) {
+      btn.dataset.reposted = 'false'
+      btn.style.color = '#555'
+      if (countEl) countEl.textContent = current
+    }
+  })
 }
 
 // ─── Story Bar ────────────────────────────────────────────────────────────────
@@ -464,14 +676,18 @@ function _wireComposer(profile, navigate) {
       mediaType = detectMediaType(mediaUrl)
     }
     msg.textContent = 'Posten...'
-    const { error } = await supabase.from('posts').insert({
+    const { error } = await insertPost({
       user_id: profile.id, media_url: mediaUrl, media_type: mediaType, mood, visibility: postVisibility,
     })
     if (error) { msg.textContent = error.message; return }
     msg.textContent = '✓ Gepostet!'
     setTimeout(() => {
       _closeComposerModal()
-      if (location.pathname.startsWith('/u/' + profile.username)) navigate('/u/' + profile.username)
+      if (location.pathname.startsWith('/u/' + profile.username)) {
+        navigate('/u/' + profile.username)
+      } else if (location.pathname === '/' && document.querySelector('#feed-grid')) {
+        loadFeed(profile, navigate)
+      }
     }, 600)
   })
 
@@ -738,13 +954,12 @@ function _renderComments(comments, list) {
 
 export function setupRealtimeLikes(currentUserId, onChannelReady) {
   const channel = supabase.channel('likes-realtime')
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'likes' }, payload => {
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'likes' }, async payload => {
       const postId = payload.new?.post_id || payload.old?.post_id; if (!postId) return
       if ((payload.new?.user_id || payload.old?.user_id) === currentUserId) return
-      supabase.from('likes').select('*', { count: 'exact', head: true }).eq('post_id', postId).then(({ count }) => {
-        const el = document.querySelector(`.like-count[data-post-id="${postId}"]`)
-        if (el && count !== null) el.textContent = count
-      })
+      const count = await getLikeCount(postId)
+      const el = document.querySelector(`.like-count[data-post-id="${postId}"]`)
+      if (el) el.textContent = count
     }).subscribe()
   onChannelReady?.(channel)
 }

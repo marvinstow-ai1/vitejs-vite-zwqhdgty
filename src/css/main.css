@@ -360,6 +360,32 @@ body[data-nav="bottom"] .app-main { padding-bottom: 96px; }
 }
 .toast.show { opacity: 1; }
 
+/* ─── Feed grid (mobile-first) ─────────────────────────────── */
+.feed-wrap { max-width: 720px; margin: 0 auto; padding: 12px 12px 96px; }
+.feed-grid { column-count: 2; column-gap: 8px; }
+@media (min-width: 600px) { .feed-grid { column-count: 3; column-gap: 10px; } }
+@media (min-width: 900px) { .feed-grid { column-count: 3; column-gap: 12px; } }
+.feed-card {
+  break-inside: avoid;
+  margin-bottom: 8px;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #111;
+  border: 1px solid #1a1a1a;
+}
+.feed-card-foot {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 10px;
+}
+.feed-card-foot .meta { min-width: 0; }
+.feed-card-foot .actions { display: flex; align-items: center; gap: 2px; flex-shrink: 0; }
+.feed-state {
+  max-width: 480px; margin: 32px auto;
+  padding: 28px 20px;
+  text-align: center;
+  color: #888; font-size: 13px; line-height: 1.6;
+}
+
 /* ─── Util ─────────────────────────────────────────────────── */
 .hidden { display: none !important; }
 .scroll-thin { scrollbar-width: thin; }
