@@ -1,8 +1,10 @@
 import { supabase } from '../supabase.js'
 import { getSession } from '../services/auth.service.js'
-import { getProfileByUsername, updateProfile, getFollowCounts } from '../services/profiles.service.js'
+import { getProfileByUsername, updateProfile, getFollowCounts, getRelationshipStatus } from '../services/profiles.service.js'
 import { getVisiblePostIds } from '../services/posts.service.js'
-import { followUser, unfollowUser, blockUser, unblockUser, createNotification } from '../services/interactions.service.js'
+import { followUser, unfollowUser, blockUser, unblockUser } from '../services/interactions.service.js'
+import { notifyAction } from '../services/notify.action.js'
+import { uploadHeaderImage } from '../services/media.service.js'
 import { getBoardsByUser, getProfileReposts, getUserRepostIds, createBoard, updateBoard } from '../services/boards.service.js'
 import { loadProfileStories, getViewedStoryIds } from '../services/stories.service.js'
 import { renderBoardPost, wireBoardRepostButtons, loadBoardContent } from './board.page.js'
@@ -37,14 +39,10 @@ export async function showProfilePage(username, ctx) {
   let iBlocked = false, iAmBlocked = false
 
   if (currentUserId && !isOwner) {
-    const [fwRes, bOutRes, bInRes] = await Promise.all([
-      supabase.from('friendships').select('id').eq('user_id', currentUserId).eq('friend_id', profile.id).eq('status', 'accepted').maybeSingle(),
-      supabase.from('blocks').select('id').eq('blocker_id', currentUserId).eq('blocked_id', profile.id).maybeSingle(),
-      supabase.from('blocks').select('id').eq('blocker_id', profile.id).eq('blocked_id', currentUserId).maybeSingle(),
-    ])
-    following = !!fwRes.data
-    iBlocked = !!bOutRes.data
-    iAmBlocked = !!bInRes.data
+    const rel = await getRelationshipStatus(currentUserId, profile.id)
+    following = rel.following
+    iBlocked = rel.iBlocked
+    iAmBlocked = rel.iAmBlocked
   }
 
   if (iAmBlocked) {
@@ -315,7 +313,7 @@ export async function showProfilePage(username, ctx) {
       if (error) { console.error('follow failed', error); btn.disabled = false; return }
       following = true
       btn.textContent = 'Entfolgen'; btn.style.background = 'transparent'; btn.style.color = '#fff'
-      createNotification(profile.id, currentUserId, 'follow').catch(e => console.error('follow notif failed', e))
+      notifyAction(profile.id, currentUserId, 'follow').catch(e => console.error('follow notif failed', e))
     }
     btn.disabled = false
   })
@@ -456,11 +454,9 @@ export async function showProfilePage(username, ctx) {
   document.querySelector('#header-file').addEventListener('change', async e => {
     const file = e.target.files[0]; if (!file) return
     const btn = document.querySelector('#btn-upload'); btn.textContent = 'Hochladen...'
-    const ext = file.name.split('.').pop()
-    const { error } = await supabase.storage.from('headers').upload(`${currentUserId}/header.${ext}`, file, { upsert: true })
+    const { url, error } = await uploadHeaderImage(file, currentUserId)
     if (error) { btn.textContent = '❌ Fehler'; return }
-    const { data: urlData } = supabase.storage.from('headers').getPublicUrl(`${currentUserId}/header.${ext}`)
-    currentImageUrl = urlData.publicUrl
+    currentImageUrl = url
     document.querySelector('#img-preview-wrap').innerHTML = `<img id="img-preview" src="${currentImageUrl}" style="position:absolute;width:100%;height:100%;object-fit:cover;user-select:none;transform-origin:center;" />`
     btn.textContent = '✅ Hochgeladen'
     _setupImgDrag(currentImagePos)

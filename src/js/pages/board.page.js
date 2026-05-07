@@ -58,13 +58,9 @@ async function _handleBoardRepost(btn, currentUserId, openRepostModal) {
 
   if (ownerId === currentUserId) return
 
-  const { data: boards } = await supabase
-    .from('boards')
-    .select('id, title, visibility')
-    .eq('user_id', currentUserId)
-    .order('position', { ascending: true })
+  const boards = await getBoardsByUser(currentUserId)
 
-  openRepostModal(boards || [], async ({ boardId, showOnProfile }) => {
+  openRepostModal(boards, async ({ boardId, showOnProfile }) => {
     btn.dataset.reposted = 'true'
     btn.style.color = '#06d6a0'
     await addRepost(postId, currentUserId, ownerId, { boardId, showOnProfile })

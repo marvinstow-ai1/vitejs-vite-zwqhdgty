@@ -2,8 +2,10 @@ import { supabase } from '../supabase.js'
 import { shellHtml, wireShellNav, applyNavPref, refreshUnreadBadge } from '../shell.js'
 import { iconSvg, escapeHtml, detectMediaType, renderMediaEl, timeAgo } from '../utils.js'
 import { loadFeedPosts, getVisiblePostIds, loadPostInteractions, loadMoodTags, loadUsernameMap, insertPost } from '../services/posts.service.js'
-import { toggleLike, addRepost, removeRepost, getOrCreateRepostsBoardId, loadComments, insertComment, createNotification, getLikeCount } from '../services/interactions.service.js'
+import { toggleLike, addRepost, removeRepost, getOrCreateRepostsBoardId, loadComments, insertComment, getLikeCount } from '../services/interactions.service.js'
 import { getBoardsByUser } from '../services/boards.service.js'
+import { notifyAction } from '../services/notify.action.js'
+import { uploadPostMedia } from '../services/media.service.js'
 import { loadNotifications, getUnreadCount, markAllRead, subscribeToNotifications } from '../services/notifications.service.js'
 import { loadStoriesForUser, markStoryViewed, getStoryViewers, deleteStory, uploadStoryFile, insertStory } from '../services/stories.service.js'
 import { searchProfiles } from '../services/profiles.service.js'
@@ -692,13 +694,8 @@ function _wireComposer(profile, navigate) {
   })
 
   async function _handleFileSelect(file, userId) {
-    if (file.size > 50 * 1024 * 1024) {
-      document.querySelector('#composer-modal #post-msg').textContent = 'Max 50MB'; return
-    }
-    const isVideo = file.type.startsWith('video/'), isGif = file.type === 'image/gif'
-    const ext = file.name.split('.').pop().toLowerCase()
-    const path = `${userId}/${Date.now()}.${ext}`
-    const bucket = isVideo ? 'videos' : 'images'
+    const msgEl = document.querySelector('#composer-modal #post-msg')
+    const isVideo = file.type.startsWith('video/')
     const previewWrap = document.querySelector('#composer-modal #upload-preview')
     previewWrap.style.display = 'block'
     dropZone.style.display = 'none'
@@ -715,12 +712,15 @@ function _wireComposer(profile, navigate) {
     const bar = document.querySelector('#composer-modal #upload-bar')
     const status = document.querySelector('#composer-modal #upload-status')
     progress.style.display = 'block'; bar.style.width = '30%'; status.textContent = 'Hochladen...'
-    const { error } = await supabase.storage.from(bucket).upload(path, file, { upsert: true })
-    if (error) { status.textContent = '❌ ' + error.message; return }
+    const { url, type, error } = await uploadPostMedia(file, userId)
+    if (error) {
+      status.textContent = '❌ ' + error.message
+      if (msgEl && error.message === 'Max 50MB') msgEl.textContent = 'Max 50MB'
+      return
+    }
     bar.style.width = '100%'
-    const { data: urlData } = supabase.storage.from(bucket).getPublicUrl(path)
-    uploadedUrl = urlData.publicUrl
-    uploadedType = isVideo ? 'video' : isGif ? 'gif' : 'image'
+    uploadedUrl = url
+    uploadedType = type
     status.textContent = '✅ Bereit'
     setTimeout(() => { progress.style.display = 'none' }, 1500)
   }
@@ -931,7 +931,7 @@ export async function openCommentsModal(postId, mediaUrl, mediaType, currentUser
     const countEl = document.querySelector(`.comment-count[data-post-id="${postId}"]`)
     if (countEl) countEl.textContent = parseInt(countEl.textContent || '0') + 1
     list.scrollTop = list.scrollHeight
-    if (postOwnerId) await createNotification(postOwnerId, currentUserId, 'comment', postId)
+    if (postOwnerId) await notifyAction(postOwnerId, currentUserId, 'comment', postId)
   })
   input.onkeydown = e => { if (e.key === 'Enter') newBtn.click() }
   input.focus()
