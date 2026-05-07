@@ -867,7 +867,7 @@ async function handleRepost(btn, currentUserId) {
     btn.dataset.reposted = 'true'; btn.style.color = '#06d6a0'
     if (countEl) countEl.textContent = current + 1
     const { error: repErr } = await supabase.from('reposts').insert({ post_id: postId, user_id: currentUserId })
-    if (repErr) {
+    if (repErr && repErr.code !== '23505') {
       btn.dataset.reposted = 'false'; btn.style.color = '#555'
       if (countEl) countEl.textContent = current
       console.error('repost insert failed', repErr); return
