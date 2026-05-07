@@ -37,8 +37,11 @@
 
 - [x] komplettes RLS-Audit für alle genutzten Tabellen durchführen → `docs/PHASE3_RLS_AUDIT.md`
 - [x] Migrations-Entwurf für RLS + Schema-Härtung → `supabase/migrations/0001_phase3_rls.sql`
+- [x] Migrations-Entwurf v2 reviewed: idempotent, Helper-Funktionen mit gehärtetem `search_path`, `profiles_select` auf Block-Awareness reduziert (verhindert kaputte Username-Joins), `notifications_update` auf `read=true` eingeschränkt, Storage-Block als ausführbares SQL statt Kommentar, Rollback-Sektion ergänzt
+- [x] Apply-Plan + Verification-Checklist + Rollback dokumentiert → `docs/PHASE3_APPLY_PLAN.md`
 - [x] Frontend-Sichtbarkeitslogik klar als UX-Filter markiert (`getVisiblePostIds`)
 - [x] Trusted-Action-Seam für Notifications (`services/notify.action.js`) — single point für Phase-7-Migration
+- [ ] Pre-apply Schema-Audit fahren (siehe `PHASE3_APPLY_PLAN.md` §0)
 - [ ] Migration auf einer Supabase-Branch testen (manuell, nicht durch den Agent)
 - [ ] RLS aktivieren, Policy für Policy:
   - [ ] profiles
