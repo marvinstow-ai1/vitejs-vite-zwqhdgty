@@ -12,7 +12,9 @@ function handleRoute() {
   const path = window.location.pathname
   const boardMatch = path.match(/^\/u\/([a-z0-9_]+)\/board\/([a-z0-9-]+)$/i)
   const profileMatch = path.match(/^\/u\/([a-z0-9_]+)$/i)
-  if (boardMatch) showBoardPage(boardMatch[1], boardMatch[2])
+  if (path === '/settings') showSettingsPage()
+  else if (path === '/explore') showExplorePage()
+  else if (boardMatch) showBoardPage(boardMatch[1], boardMatch[2])
   else if (profileMatch) showProfilePage(profileMatch[1])
   else init()
 }
@@ -97,6 +99,289 @@ let realtimeChannel = null
 let notifChannel = null
 let searchTimeout = null
 let activeMood = null
+let currentProfile = null
+let unreadNotifCount = 0
+
+// ─── Nav preference ───────────────────────────────────────────────────────────
+
+function getNavPref() {
+  return localStorage.getItem('nav_pref') || 'auto'
+}
+function setNavPref(v) {
+  localStorage.setItem('nav_pref', v)
+  applyNavPref()
+}
+function applyNavPref() {
+  document.body.dataset.nav = getNavPref()
+}
+applyNavPref()
+
+// ─── Icons (lucide-stroke style) ──────────────────────────────────────────────
+
+const ICONS = {
+  home: '<path d="M3 9.5L12 3l9 6.5V20a1 1 0 0 1-1 1h-5v-7h-6v7H4a1 1 0 0 1-1-1V9.5z"/>',
+  compass: '<circle cx="12" cy="12" r="9"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/>',
+  plus: '<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>',
+  bell: '<path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>',
+  user: '<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
+  settings: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>',
+  x: '<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>',
+  search: '<circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>',
+  logOut: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>',
+  lock: '<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
+  shield: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>',
+  ban: '<circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/>',
+  layout: '<rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/>',
+  edit: '<path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/>',
+  chevR: '<polyline points="9 18 15 12 9 6"/>',
+  chevL: '<polyline points="15 18 9 12 15 6"/>',
+}
+function iconSvg(name, size = 20) {
+  return `<svg viewBox="0 0 24 24" width="${size}" height="${size}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[name] || ''}</svg>`
+}
+
+// ─── Shell (sidebar + bottombar) ──────────────────────────────────────────────
+
+function shellHtml(active, profile) {
+  const u = profile?.username
+  const items = [
+    { key: 'home',    label: 'Feed',    icon: 'home',    href: '/' },
+    { key: 'explore', label: 'Explore', icon: 'compass', href: '/explore' },
+    { key: 'post',    label: 'Posten',  icon: 'plus',    fab: true },
+    { key: 'notif',   label: 'Inbox',   icon: 'bell',    badge: true },
+    { key: 'profile', label: 'Profil',  icon: 'user',    href: u ? `/u/${u}` : '/' },
+  ]
+  const sidebarItems = items.map(it => {
+    if (it.fab) {
+      return `<button class="nav-item" data-nav-key="${it.key}" style="background:rgba(255,255,255,.08);">${iconSvg(it.icon)}<span>${it.label}</span></button>`
+    }
+    const cls = active === it.key ? 'nav-item active' : 'nav-item'
+    const badge = it.badge ? `<span class="nav-badge hidden" id="nav-badge-${it.key}"></span>` : ''
+    return `<button class="${cls}" data-nav-key="${it.key}">${iconSvg(it.icon)}<span>${it.label}</span>${badge}</button>`
+  }).join('')
+
+  const bottomItems = items.map(it => {
+    const cls = ['bottombar-btn']
+    if (active === it.key) cls.push('active')
+    if (it.fab) cls.push('fab')
+    const dot = it.badge ? `<span class="nav-dot" id="nav-dot-${it.key}"></span>` : ''
+    return `<button class="${cls.join(' ')}" data-nav-key="${it.key}" aria-label="${it.label}">${iconSvg(it.icon, 22)}${dot}</button>`
+  }).join('')
+
+  return `
+    <aside class="sidebar">
+      <div class="sidebar-brand" data-nav-key="brand">Marvin's Place</div>
+      ${sidebarItems}
+      <div class="sidebar-spacer"></div>
+      <button class="nav-item" data-nav-key="settings">${iconSvg('settings')}<span>Einstellungen</span></button>
+    </aside>
+    <nav class="bottombar" aria-label="Navigation">${bottomItems}</nav>
+  `
+}
+
+function wireShellNav(profile) {
+  const u = profile?.username
+  document.querySelectorAll('[data-nav-key]').forEach(el => {
+    const key = el.dataset.navKey
+    el.addEventListener('click', () => {
+      if (key === 'home' || key === 'brand') navigate('/')
+      else if (key === 'explore') navigate('/explore')
+      else if (key === 'profile') { if (u) navigate('/u/' + u) }
+      else if (key === 'settings') navigate('/settings')
+      else if (key === 'post') openComposerModal(profile)
+      else if (key === 'notif') toggleNotifPanel(profile)
+    })
+  })
+  refreshUnreadBadge()
+}
+
+function refreshUnreadBadge() {
+  const count = unreadNotifCount || 0
+  const sb = document.querySelector('#nav-badge-notif')
+  const bb = document.querySelector('#nav-dot-notif')
+  if (sb) {
+    if (count > 0) { sb.textContent = count > 99 ? '99+' : String(count); sb.classList.remove('hidden') }
+    else sb.classList.add('hidden')
+  }
+  if (bb) bb.classList.toggle('show', count > 0)
+}
+
+// ─── Composer modal (FAB-triggered) ───────────────────────────────────────────
+
+function composerModalHtml() {
+  return `
+    <div class="modal-overlay" id="composer-overlay"></div>
+    <div class="modal" id="composer-modal" role="dialog" aria-label="Neuer Post">
+      <div class="modal-head">
+        <span class="modal-title">Neuer Post</span>
+        <button class="icon-btn icon-btn-sm" id="composer-close" aria-label="Schließen">${iconSvg('x', 16)}</button>
+      </div>
+      <div class="modal-body">
+        <div style="display:flex;gap:6px;margin-bottom:14px;">
+          <button class="post-tab" data-tab="upload" style="padding:6px 14px;border-radius:20px;border:none;background:#fff;color:#000;font-size:12px;font-weight:500;cursor:pointer;">📁 Upload</button>
+          <button class="post-tab" data-tab="url" style="padding:6px 14px;border-radius:20px;border:1px solid #333;background:transparent;color:#aaa;font-size:12px;cursor:pointer;">🔗 URL</button>
+          <button class="post-tab" data-tab="embed" style="padding:6px 14px;border-radius:20px;border:1px solid #333;background:transparent;color:#aaa;font-size:12px;cursor:pointer;">▶️ Embed</button>
+        </div>
+        <div id="tab-upload" style="margin-bottom:12px;">
+          <input id="post-file" type="file" accept="image/*,video/*,.gif" style="display:none;" />
+          <div id="upload-drop" style="border:2px dashed #2a2a2a;border-radius:10px;padding:28px 16px;text-align:center;cursor:pointer;">
+            <div style="font-size:28px;margin-bottom:8px;">📷</div>
+            <p style="color:#aaa;font-size:13px;margin:0;">Foto, GIF oder Video auswählen</p>
+            <p style="color:#666;font-size:11px;margin-top:4px;">oder hierher ziehen</p>
+          </div>
+          <div id="upload-preview" style="display:none;margin-top:10px;border-radius:10px;overflow:hidden;position:relative;"></div>
+          <div id="upload-progress" style="display:none;margin-top:10px;">
+            <div style="background:#1a1a1a;border-radius:4px;height:4px;overflow:hidden;"><div id="upload-bar" style="height:100%;background:#fff;width:0%;transition:width 0.3s;"></div></div>
+            <p id="upload-status" style="color:#aaa;font-size:11px;margin-top:6px;"></p>
+          </div>
+        </div>
+        <div id="tab-url" style="display:none;margin-bottom:12px;">
+          <input id="post-url" class="input" type="text" placeholder="https://... (Bild, GIF, Video)" />
+        </div>
+        <div id="tab-embed" style="display:none;margin-bottom:12px;">
+          <input id="post-embed" class="input" type="text" placeholder="YouTube URL einfügen..." />
+          <p style="color:#666;font-size:11px;margin-top:6px;">YouTube Videos & Playlists</p>
+        </div>
+        <div style="position:relative;margin-bottom:12px;">
+          <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#666;font-size:13px;">#</span>
+          <input id="post-mood" class="input" type="text" placeholder="mood, vibe, aesthetic..." style="padding-left:24px;" />
+        </div>
+        <div style="display:flex;gap:6px;margin-bottom:6px;">
+          <button class="vis-btn" data-vis="public" style="padding:5px 12px;border-radius:20px;border:none;background:#fff;color:#000;font-size:12px;font-weight:500;cursor:pointer;">🌍 Alle</button>
+          <button class="vis-btn" data-vis="followers" style="padding:5px 12px;border-radius:20px;border:1px solid #333;background:transparent;color:#aaa;font-size:12px;cursor:pointer;">👥 Follower</button>
+          <button class="vis-btn" data-vis="private" style="padding:5px 12px;border-radius:20px;border:1px solid #333;background:transparent;color:#aaa;font-size:12px;cursor:pointer;">🔒 Nur ich</button>
+        </div>
+      </div>
+      <div class="modal-foot">
+        <span id="post-msg" style="color:#aaa;font-size:13px;margin-right:auto;align-self:center;"></span>
+        <button class="btn" id="composer-cancel">Abbrechen</button>
+        <button class="btn btn-primary" id="btn-post">Posten</button>
+      </div>
+    </div>
+  `
+}
+
+function openComposerModal(profile) {
+  if (!profile) return
+  let host = document.querySelector('#composer-host')
+  if (!host) {
+    host = document.createElement('div')
+    host.id = 'composer-host'
+    document.body.appendChild(host)
+  }
+  host.innerHTML = composerModalHtml()
+  document.body.classList.add('no-scroll')
+  document.querySelector('#composer-overlay').classList.add('show')
+  document.querySelector('#composer-modal').classList.add('show')
+  document.querySelector('#composer-close').onclick = closeComposerModal
+  document.querySelector('#composer-cancel').onclick = closeComposerModal
+  document.querySelector('#composer-overlay').onclick = closeComposerModal
+  wireComposer(profile)
+}
+
+function closeComposerModal() {
+  const host = document.querySelector('#composer-host')
+  if (host) host.innerHTML = ''
+  document.body.classList.remove('no-scroll')
+}
+
+function wireComposer(profile) {
+  // visibility picker
+  let postVisibility = 'public'
+  document.querySelectorAll('#composer-modal .vis-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      postVisibility = btn.dataset.vis
+      document.querySelectorAll('#composer-modal .vis-btn').forEach(b => { b.style.background = 'transparent'; b.style.color = '#aaa'; b.style.border = '1px solid #333' })
+      btn.style.background = '#fff'; btn.style.color = '#000'; btn.style.border = 'none'
+    })
+  })
+
+  // post tabs
+  let activeTab = 'upload', uploadedUrl = null, uploadedType = null
+  const tabs = ['upload', 'url', 'embed']
+  document.querySelectorAll('#composer-modal .post-tab').forEach(btn => {
+    btn.addEventListener('click', () => {
+      activeTab = btn.dataset.tab
+      tabs.forEach(t => {
+        document.querySelector(`#composer-modal #tab-${t}`).style.display = t === activeTab ? 'block' : 'none'
+        const tb = document.querySelector(`#composer-modal .post-tab[data-tab="${t}"]`)
+        tb.style.background = t === activeTab ? '#fff' : 'transparent'
+        tb.style.color = t === activeTab ? '#000' : '#aaa'
+        tb.style.border = t === activeTab ? 'none' : '1px solid #333'
+      })
+    })
+  })
+
+  const dropZone = document.querySelector('#composer-modal #upload-drop')
+  const fileInput = document.querySelector('#composer-modal #post-file')
+  dropZone.addEventListener('click', () => fileInput.click())
+  dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.style.borderColor = '#777' })
+  dropZone.addEventListener('dragleave', () => { dropZone.style.borderColor = '#2a2a2a' })
+  dropZone.addEventListener('drop', e => { e.preventDefault(); dropZone.style.borderColor = '#2a2a2a'; if (e.dataTransfer.files[0]) handleFileSelect(e.dataTransfer.files[0]) })
+  fileInput.addEventListener('change', e => { if (e.target.files[0]) handleFileSelect(e.target.files[0]) })
+
+  async function handleFileSelect(file) {
+    const userId = profile.id
+    if (file.size > 50 * 1024 * 1024) { document.querySelector('#composer-modal #post-msg').textContent = 'Max 50MB'; return }
+    const isVideo = file.type.startsWith('video/'), isGif = file.type === 'image/gif'
+    const ext = file.name.split('.').pop().toLowerCase()
+    const path = `${userId}/${Date.now()}.${ext}`
+    const bucket = isVideo ? 'videos' : 'images'
+    const previewWrap = document.querySelector('#composer-modal #upload-preview')
+    previewWrap.style.display = 'block'; dropZone.style.display = 'none'
+    previewWrap.innerHTML = `
+      <button id="upload-clear" style="position:absolute;top:8px;right:8px;z-index:2;background:rgba(0,0,0,0.7);color:#fff;border:none;border-radius:50%;width:28px;height:28px;cursor:pointer;font-size:16px;line-height:1;">×</button>
+      ${isVideo ? `<video src="${URL.createObjectURL(file)}" style="width:100%;max-height:280px;object-fit:cover;display:block;" autoplay loop muted playsinline></video>` : `<img src="${URL.createObjectURL(file)}" style="width:100%;max-height:280px;object-fit:cover;display:block;" />`}`
+    previewWrap.querySelector('#upload-clear').addEventListener('click', () => {
+      uploadedUrl = null; uploadedType = null; previewWrap.style.display = 'none'; dropZone.style.display = 'block'; fileInput.value = ''
+    })
+    const progress = document.querySelector('#composer-modal #upload-progress'), bar = document.querySelector('#composer-modal #upload-bar'), status = document.querySelector('#composer-modal #upload-status')
+    progress.style.display = 'block'; bar.style.width = '30%'; status.textContent = 'Hochladen...'
+    const { error } = await supabase.storage.from(bucket).upload(path, file, { upsert: true })
+    if (error) { status.textContent = '❌ ' + error.message; return }
+    bar.style.width = '100%'
+    const { data: urlData } = supabase.storage.from(bucket).getPublicUrl(path)
+    uploadedUrl = urlData.publicUrl; uploadedType = isVideo ? 'video' : isGif ? 'gif' : 'image'
+    status.textContent = '✅ Bereit'
+    setTimeout(() => { progress.style.display = 'none' }, 1500)
+  }
+
+  document.querySelector('#composer-modal #btn-post').addEventListener('click', async () => {
+    const moodRaw = document.querySelector('#composer-modal #post-mood').value.trim()
+    const mood = moodRaw.replace(/^#+/, '').toLowerCase().replace(/\s+/g, '_') || null
+    const msg = document.querySelector('#composer-modal #post-msg')
+    let mediaUrl = null, mediaType = 'image'
+    if (activeTab === 'upload') {
+      if (!uploadedUrl) { msg.textContent = 'Bitte erst Datei hochladen'; return }
+      mediaUrl = uploadedUrl; mediaType = uploadedType || 'image'
+    } else if (activeTab === 'url') {
+      mediaUrl = document.querySelector('#composer-modal #post-url').value.trim()
+      if (!mediaUrl) { msg.textContent = 'URL fehlt'; return }
+      mediaType = detectMediaType(mediaUrl)
+    } else if (activeTab === 'embed') {
+      mediaUrl = document.querySelector('#composer-modal #post-embed').value.trim()
+      if (!mediaUrl) { msg.textContent = 'Embed-URL fehlt'; return }
+      mediaType = detectMediaType(mediaUrl)
+    }
+    msg.textContent = 'Posten...'
+    const { error } = await supabase.from('posts').insert({ user_id: profile.id, media_url: mediaUrl, media_type: mediaType, mood, visibility: postVisibility })
+    if (error) { msg.textContent = error.message; return }
+    msg.textContent = '✓ Gepostet!'
+    setTimeout(() => { closeComposerModal(); if (location.pathname === '/') { activeMood = null; loadMoodChips(profile.id); loadPosts(profile.id) } }, 600)
+  })
+}
+
+function toggleNotifPanel(profile) {
+  // delegate to existing notif dropdown if present (feed page)
+  const dd = document.querySelector('#notif-dropdown')
+  if (dd) {
+    dd.style.display = dd.style.display === 'block' ? 'none' : 'block'
+    if (dd.style.display === 'block') loadNotifications(profile.id)
+    return
+  }
+  // otherwise navigate home (feed has the panel)
+  navigate('/')
+}
 
 // ─── Media Helpers ────────────────────────────────────────────────────────────
 
@@ -409,91 +694,49 @@ function openStoryViewer(stories, currentUserId, viewedSet, onClose) {
 // ─── Feed ─────────────────────────────────────────────────────────────────────
 
 async function showFeed(profile) {
+  currentProfile = profile
   document.querySelector('#app').innerHTML = `
-    <div style="background:#0a0a0a;min-height:100vh;color:#fff;">
-      <header style="padding:12px 16px;border-bottom:1px solid #1a1a1a;display:flex;align-items:center;gap:12px;position:sticky;top:0;background:#0a0a0a;z-index:10;">
-        <span style="font-size:16px;font-weight:500;white-space:nowrap;flex-shrink:0;cursor:pointer;" id="logo">Marvin's Place</span>
-        <div style="flex:1;max-width:320px;position:relative;">
-          <input id="search-input" type="text" placeholder="User suchen..." style="width:100%;padding:8px 12px 8px 32px;background:#1a1a1a;border:1px solid #222;border-radius:8px;color:#fff;font-size:13px;outline:none;box-sizing:border-box;" />
-          <span style="position:absolute;left:10px;top:50%;transform:translateY(-50%);font-size:13px;color:#444;">🔍</span>
-          <div id="search-dropdown" style="display:none;position:absolute;top:calc(100% + 6px);left:0;right:0;background:#111;border:1px solid #222;border-radius:10px;overflow:hidden;z-index:50;box-shadow:0 8px 32px rgba(0,0,0,0.6);"></div>
-        </div>
-        <div style="display:flex;align-items:center;gap:10px;margin-left:auto;flex-shrink:0;">
-          <div style="position:relative;">
-            <button id="notif-btn" style="background:none;border:none;cursor:pointer;color:#555;font-size:18px;padding:4px;line-height:1;position:relative;">🔔
-              <span id="notif-badge" style="display:none;position:absolute;top:-2px;right:-2px;background:#ff4d6d;color:#fff;font-size:9px;font-weight:700;border-radius:50%;width:14px;height:14px;align-items:center;justify-content:center;line-height:1;"></span>
-            </button>
-            <div id="notif-dropdown" style="display:none;position:absolute;right:0;top:calc(100% + 8px);width:300px;background:#111;border:1px solid #222;border-radius:12px;overflow:hidden;z-index:50;box-shadow:0 8px 32px rgba(0,0,0,0.6);">
-              <div style="padding:12px 16px;border-bottom:1px solid #1f1f1f;display:flex;align-items:center;justify-content:space-between;">
-                <span style="font-size:13px;font-weight:500;color:#fff;">Benachrichtigungen</span>
-                <button id="notif-mark-read" style="background:none;border:none;cursor:pointer;font-size:11px;color:#555;">Alle gelesen</button>
+    <div class="app-shell">
+      ${shellHtml('home', profile)}
+      <main class="app-main">
+        <header class="topbar">
+          <span style="font-size:16px;font-weight:600;letter-spacing:.02em;cursor:pointer;flex-shrink:0;" id="logo">Marvin's Place</span>
+          <div class="topbar-search">
+            <span class="topbar-search-icon">${iconSvg('search', 16)}</span>
+            <input id="search-input" class="input" type="text" placeholder="User suchen..." />
+            <div id="search-dropdown" style="display:none;position:absolute;top:calc(100% + 6px);left:0;right:0;background:var(--panel);border:1px solid var(--border);border-radius:var(--radius-md);overflow:hidden;z-index:50;box-shadow:var(--shadow-elev);"></div>
+          </div>
+          <div class="topbar-actions">
+            <div style="position:relative;">
+              <button id="notif-btn" class="icon-btn" aria-label="Benachrichtigungen">
+                ${iconSvg('bell', 18)}
+                <span id="notif-badge" style="display:none;position:absolute;top:-2px;right:-2px;background:var(--danger);color:#fff;font-size:9px;font-weight:700;border-radius:50%;min-width:16px;height:16px;padding:0 4px;align-items:center;justify-content:center;line-height:1;"></span>
+              </button>
+              <div id="notif-dropdown" style="display:none;position:absolute;right:0;top:calc(100% + 8px);width:320px;background:var(--panel);border:1px solid var(--border);border-radius:var(--radius-md);overflow:hidden;z-index:50;box-shadow:var(--shadow-elev);backdrop-filter:blur(24px);">
+                <div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;">
+                  <span style="font-size:13px;font-weight:600;color:#fff;">Benachrichtigungen</span>
+                  <button id="notif-mark-read" style="background:none;border:none;cursor:pointer;font-size:11px;color:var(--text-mute);">Alle gelesen</button>
+                </div>
+                <div id="notif-list" style="max-height:340px;overflow-y:auto;"></div>
               </div>
-              <div id="notif-list" style="max-height:320px;overflow-y:auto;"></div>
             </div>
           </div>
-          <span id="header-username" data-username="${profile.username}" style="font-size:14px;color:#666;cursor:pointer;">@${profile.username}</span>
-          <button id="btn-logout" style="padding:6px 14px;background:transparent;color:#666;border:1px solid #333;border-radius:6px;cursor:pointer;font-size:12px;">Ausloggen</button>
+        </header>
+        <span id="header-username" data-username="${profile.username}" class="hidden">@${profile.username}</span>
+
+        <div id="story-bar" style="display:flex;gap:12px;padding:14px 16px;overflow-x:auto;border-bottom:1px solid var(--border);scrollbar-width:none;-webkit-overflow-scrolling:touch;"></div>
+
+        <div style="max-width:1200px;margin:0 auto;padding:14px 16px 8px;">
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+            <button id="filter-all" style="padding:6px 14px;background:#fff;color:#000;border:none;border-radius:20px;font-size:12px;font-weight:500;cursor:pointer;white-space:nowrap;">Alle</button>
+            <div id="mood-chips" style="display:flex;gap:6px;flex-wrap:wrap;"></div>
+          </div>
         </div>
-      </header>
 
-      <!-- Story Bar -->
-      <div id="story-bar" style="display:flex;gap:12px;padding:14px 16px;overflow-x:auto;border-bottom:1px solid #111;scrollbar-width:none;-webkit-overflow-scrolling:touch;"></div>
-
-      <!-- Post Composer -->
-      <div style="max-width:600px;margin:24px auto;padding:0 16px;">
-        <div style="background:#111;border:1px solid #222;border-radius:12px;padding:16px;">
-          <p style="color:#666;font-size:12px;margin-bottom:12px;text-transform:uppercase;letter-spacing:0.05em;">Neuer Post</p>
-          <div style="display:flex;gap:6px;margin-bottom:14px;">
-            <button class="post-tab" data-tab="upload" style="padding:6px 14px;border-radius:20px;border:none;background:#fff;color:#000;font-size:12px;font-weight:500;cursor:pointer;">📁 Upload</button>
-            <button class="post-tab" data-tab="url" style="padding:6px 14px;border-radius:20px;border:1px solid #333;background:transparent;color:#555;font-size:12px;cursor:pointer;">🔗 URL</button>
-            <button class="post-tab" data-tab="embed" style="padding:6px 14px;border-radius:20px;border:1px solid #333;background:transparent;color:#555;font-size:12px;cursor:pointer;">▶️ Embed</button>
-          </div>
-          <div id="tab-upload" style="margin-bottom:12px;">
-            <input id="post-file" type="file" accept="image/*,video/*,.gif" style="display:none;" />
-            <div id="upload-drop" style="border:2px dashed #2a2a2a;border-radius:10px;padding:28px 16px;text-align:center;cursor:pointer;">
-              <div style="font-size:28px;margin-bottom:8px;">📷</div>
-              <p style="color:#555;font-size:13px;margin:0;">Foto, GIF oder Video auswählen</p>
-              <p style="color:#333;font-size:11px;margin-top:4px;">oder hierher ziehen</p>
-            </div>
-            <div id="upload-preview" style="display:none;margin-top:10px;border-radius:10px;overflow:hidden;position:relative;"></div>
-            <div id="upload-progress" style="display:none;margin-top:10px;">
-              <div style="background:#1a1a1a;border-radius:4px;height:4px;overflow:hidden;"><div id="upload-bar" style="height:100%;background:#fff;width:0%;transition:width 0.3s;"></div></div>
-              <p id="upload-status" style="color:#555;font-size:11px;margin-top:6px;"></p>
-            </div>
-          </div>
-          <div id="tab-url" style="display:none;margin-bottom:12px;">
-            <input id="post-url" type="text" placeholder="https://... (Bild, GIF, Video)" style="display:block;width:100%;padding:10px 12px;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:8px;color:#fff;font-size:14px;box-sizing:border-box;" />
-          </div>
-          <div id="tab-embed" style="display:none;margin-bottom:12px;">
-            <input id="post-embed" type="text" placeholder="YouTube URL einfügen..." style="display:block;width:100%;padding:10px 12px;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:8px;color:#fff;font-size:14px;box-sizing:border-box;" />
-            <p style="color:#444;font-size:11px;margin-top:6px;">YouTube Videos & Playlists</p>
-          </div>
-          <div style="position:relative;margin-bottom:12px;">
-            <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#555;font-size:13px;">#</span>
-            <input id="post-mood" type="text" placeholder="mood, vibe, aesthetic..." style="display:block;width:100%;padding:10px 12px 10px 24px;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:8px;color:#fff;font-size:14px;box-sizing:border-box;" />
-          </div>
-          <div style="display:flex;gap:6px;margin-bottom:14px;">
-            <button class="vis-btn" data-vis="public" style="padding:5px 12px;border-radius:20px;border:none;background:#fff;color:#000;font-size:12px;font-weight:500;cursor:pointer;">🌍 Alle</button>
-            <button class="vis-btn" data-vis="followers" style="padding:5px 12px;border-radius:20px;border:1px solid #333;background:transparent;color:#555;font-size:12px;cursor:pointer;">👥 Follower</button>
-            <button class="vis-btn" data-vis="private" style="padding:5px 12px;border-radius:20px;border:1px solid #333;background:transparent;color:#555;font-size:12px;cursor:pointer;">🔒 Nur ich</button>
-          </div>
-          <button id="btn-post" style="padding:10px 20px;background:#fff;color:#000;border:none;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;">Posten</button>
-          <span id="post-msg" style="color:#666;font-size:13px;margin-left:12px;"></span>
+        <div id="feed-grid" style="max-width:1200px;margin:0 auto;padding:8px 16px 24px;columns:3 180px;gap:10px;">
+          <p style="color:#444;font-size:14px;">Lädt...</p>
         </div>
-      </div>
-
-      <!-- Mood Filter -->
-      <div style="max-width:1200px;margin:0 auto;padding:0 16px 16px;">
-        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-          <button id="filter-all" style="padding:5px 14px;background:#fff;color:#000;border:none;border-radius:20px;font-size:12px;font-weight:500;cursor:pointer;white-space:nowrap;">Alle</button>
-          <div id="mood-chips" style="display:flex;gap:6px;flex-wrap:wrap;"></div>
-        </div>
-      </div>
-
-      <!-- Feed Grid -->
-      <div id="feed-grid" style="max-width:1200px;margin:0 auto;padding:0 16px 80px;columns:3 180px;gap:10px;">
-        <p style="color:#333;font-size:14px;">Lädt...</p>
-      </div>
+      </main>
     </div>
 
     <!-- Comments Modal -->
@@ -513,107 +756,11 @@ async function showFeed(profile) {
     </div>`
 
   loadStoryBar(profile.id)
-
-  // Visibility picker
-  let postVisibility = 'public'
-  document.querySelectorAll('.vis-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      postVisibility = btn.dataset.vis
-      document.querySelectorAll('.vis-btn').forEach(b => { b.style.background = 'transparent'; b.style.color = '#555'; b.style.border = '1px solid #333' })
-      btn.style.background = '#fff'; btn.style.color = '#000'; btn.style.border = 'none'
-    })
-  })
-
-  // Post tabs
-  let activeTab = 'upload', uploadedUrl = null, uploadedType = null
-  const tabs = ['upload', 'url', 'embed']
-  document.querySelectorAll('.post-tab').forEach(btn => {
-    btn.addEventListener('click', () => {
-      activeTab = btn.dataset.tab
-      tabs.forEach(t => {
-        document.querySelector(`#tab-${t}`).style.display = t === activeTab ? 'block' : 'none'
-        const tb = document.querySelector(`.post-tab[data-tab="${t}"]`)
-        tb.style.background = t === activeTab ? '#fff' : 'transparent'
-        tb.style.color = t === activeTab ? '#000' : '#555'
-        tb.style.border = t === activeTab ? 'none' : '1px solid #333'
-      })
-    })
-  })
-
-  const dropZone = document.querySelector('#upload-drop')
-  const fileInput = document.querySelector('#post-file')
-  dropZone.addEventListener('click', () => fileInput.click())
-  dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.style.borderColor = '#555' })
-  dropZone.addEventListener('dragleave', () => { dropZone.style.borderColor = '#2a2a2a' })
-  dropZone.addEventListener('drop', e => { e.preventDefault(); dropZone.style.borderColor = '#2a2a2a'; if (e.dataTransfer.files[0]) handleFileSelect(e.dataTransfer.files[0], profile.id) })
-  fileInput.addEventListener('change', e => { if (e.target.files[0]) handleFileSelect(e.target.files[0], profile.id) })
-
-  async function handleFileSelect(file, userId) {
-    if (file.size > 50 * 1024 * 1024) { document.querySelector('#post-msg').textContent = 'Max 50MB'; return }
-    const isVideo = file.type.startsWith('video/'), isGif = file.type === 'image/gif'
-    const ext = file.name.split('.').pop().toLowerCase()
-    const path = `${userId}/${Date.now()}.${ext}`
-    const bucket = isVideo ? 'videos' : 'images'
-    const previewWrap = document.querySelector('#upload-preview')
-    previewWrap.style.display = 'block'; dropZone.style.display = 'none'
-    previewWrap.innerHTML = `
-      <button id="upload-clear" style="position:absolute;top:8px;right:8px;z-index:2;background:rgba(0,0,0,0.7);color:#fff;border:none;border-radius:50%;width:28px;height:28px;cursor:pointer;font-size:16px;line-height:1;">×</button>
-      ${isVideo ? `<video src="${URL.createObjectURL(file)}" style="width:100%;max-height:280px;object-fit:cover;display:block;" autoplay loop muted playsinline></video>` : `<img src="${URL.createObjectURL(file)}" style="width:100%;max-height:280px;object-fit:cover;display:block;" />`}`
-    previewWrap.querySelector('#upload-clear').addEventListener('click', () => {
-      uploadedUrl = null; uploadedType = null; previewWrap.style.display = 'none'; dropZone.style.display = 'block'; fileInput.value = ''
-    })
-    const progress = document.querySelector('#upload-progress'), bar = document.querySelector('#upload-bar'), status = document.querySelector('#upload-status')
-    progress.style.display = 'block'; bar.style.width = '30%'; status.textContent = 'Hochladen...'
-    const { error } = await supabase.storage.from(bucket).upload(path, file, { upsert: true })
-    if (error) { status.textContent = '❌ ' + error.message; return }
-    bar.style.width = '100%'
-    const { data: urlData } = supabase.storage.from(bucket).getPublicUrl(path)
-    uploadedUrl = urlData.publicUrl; uploadedType = isVideo ? 'video' : isGif ? 'gif' : 'image'
-    status.textContent = '✅ Bereit'
-    setTimeout(() => { progress.style.display = 'none' }, 1500)
-  }
+  wireShellNav(profile)
 
   document.querySelector('#logo').addEventListener('click', () => navigate('/'))
-  document.querySelector('#header-username').addEventListener('click', () => navigate('/u/' + profile.username))
   setupSearch(profile.id)
   setupNotifications(profile.id)
-
-  document.querySelector('#btn-logout').addEventListener('click', async () => {
-    if (realtimeChannel) { await supabase.removeChannel(realtimeChannel); realtimeChannel = null }
-    if (notifChannel) { await supabase.removeChannel(notifChannel); notifChannel = null }
-    await supabase.auth.signOut(); showLogin()
-  })
-
-  document.querySelector('#btn-post').addEventListener('click', async () => {
-    const moodRaw = document.querySelector('#post-mood').value.trim()
-    const mood = moodRaw.replace(/^#+/, '').toLowerCase().replace(/\s+/g, '_') || null
-    const msg = document.querySelector('#post-msg')
-    let mediaUrl = null, mediaType = 'image'
-    if (activeTab === 'upload') {
-      if (!uploadedUrl) { msg.textContent = 'Bitte erst Datei hochladen'; return }
-      mediaUrl = uploadedUrl; mediaType = uploadedType || 'image'
-    } else if (activeTab === 'url') {
-      mediaUrl = document.querySelector('#post-url').value.trim()
-      if (!mediaUrl) { msg.textContent = 'URL fehlt'; return }
-      mediaType = detectMediaType(mediaUrl)
-    } else if (activeTab === 'embed') {
-      mediaUrl = document.querySelector('#post-embed').value.trim()
-      if (!mediaUrl) { msg.textContent = 'Embed-URL fehlt'; return }
-      mediaType = detectMediaType(mediaUrl)
-    }
-    msg.textContent = 'Posten...'
-    const { error } = await supabase.from('posts').insert({ user_id: profile.id, media_url: mediaUrl, media_type: mediaType, mood, visibility: postVisibility })
-    if (error) { msg.textContent = error.message; return }
-    msg.textContent = '✓ Gepostet!'
-    document.querySelector('#post-url').value = ''; document.querySelector('#post-embed').value = ''; document.querySelector('#post-mood').value = ''
-    uploadedUrl = null; uploadedType = null
-    document.querySelector('#upload-preview').style.display = 'none'; document.querySelector('#upload-drop').style.display = 'block'; fileInput.value = ''
-    postVisibility = 'public'
-    document.querySelectorAll('.vis-btn').forEach(b => { b.style.background = 'transparent'; b.style.color = '#555'; b.style.border = '1px solid #333' })
-    document.querySelector('.vis-btn[data-vis="public"]').style.cssText += ';background:#fff;color:#000;border:none;'
-    setTimeout(() => { msg.textContent = '' }, 2000)
-    activeMood = null; await loadMoodChips(profile.id); loadPosts(profile.id)
-  })
 
   document.querySelector('#modal-close').addEventListener('click', closeCommentsModal)
   document.querySelector('#comments-modal').addEventListener('click', e => { if (e.target === document.querySelector('#comments-modal')) closeCommentsModal() })
@@ -722,9 +869,12 @@ function setupNotifications(currentUserId) {
 
 async function refreshNotifBadge(currentUserId) {
   const { count } = await supabase.from('notifications').select('*', { count: 'exact', head: true }).eq('user_id', currentUserId).eq('read', false)
+  unreadNotifCount = count || 0
   const badge = document.querySelector('#notif-badge')
-  if (!badge) return
-  if (count > 0) { badge.textContent = count > 9 ? '9+' : count; badge.style.display = 'flex' } else { badge.style.display = 'none' }
+  if (badge) {
+    if (count > 0) { badge.textContent = count > 9 ? '9+' : count; badge.style.display = 'flex' } else { badge.style.display = 'none' }
+  }
+  refreshUnreadBadge()
 }
 
 async function loadNotifications(currentUserId) {
@@ -1082,13 +1232,14 @@ async function showProfilePage(username) {
             ${profilePrivacy !== 'public' ? `<div style="margin-top:8px;font-size:11px;color:rgba(255,255,255,0.5);">${profilePrivacy === 'private' ? '🔒 Privates Profil' : '👥 Nur Follower'}</div>` : ''}
           </div>
         </div>
-        <div style="position:absolute;top:16px;right:16px;z-index:2;display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;max-width:55%;">
-          <button id="btn-back" style="padding:6px 14px;background:rgba(0,0,0,0.5);color:#fff;border:1px solid rgba(255,255,255,0.2);border-radius:8px;cursor:pointer;font-size:12px;backdrop-filter:blur(8px);">← Feed</button>
+        <div style="position:absolute;top:14px;right:14px;z-index:2;display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;max-width:60%;">
+          <button id="btn-back" class="icon-btn icon-btn-sm" aria-label="Zurück" style="background:rgba(0,0,0,0.5);">${iconSvg('chevL', 14)}</button>
           ${isOwner
-            ? `<button id="btn-edit" style="padding:6px 14px;background:rgba(255,255,255,0.15);color:#fff;border:1px solid rgba(255,255,255,0.3);border-radius:8px;cursor:pointer;font-size:12px;backdrop-filter:blur(8px);">✏️ Edit</button>`
+            ? `<button id="btn-edit" class="icon-btn icon-btn-sm" aria-label="Profil bearbeiten" style="background:rgba(255,255,255,.15);">${iconSvg('edit', 14)}</button>
+               <button id="btn-settings-link" class="icon-btn icon-btn-sm" aria-label="Einstellungen" style="background:rgba(0,0,0,0.5);">${iconSvg('settings', 14)}</button>`
             : currentUserId ? `
-              ${!iBlocked ? `<button id="btn-follow" style="padding:6px 14px;background:${following ? 'transparent' : 'rgba(255,255,255,0.9)'};color:${following ? '#fff' : '#000'};border:1px solid rgba(255,255,255,0.4);border-radius:8px;cursor:pointer;font-size:12px;">${following ? 'Entfolgen' : 'Folgen'}</button>` : ''}
-              <button id="btn-block" title="${iBlocked ? 'Entblocken' : 'Blockieren'}" style="padding:6px 10px;background:rgba(0,0,0,0.5);color:${iBlocked ? '#ff4d6d' : '#fff'};border:1px solid rgba(255,255,255,0.2);border-radius:8px;cursor:pointer;font-size:12px;backdrop-filter:blur(8px);">${iBlocked ? '🚫 Entblocken' : '🚫'}</button>
+              ${!iBlocked ? `<button id="btn-follow" style="padding:6px 14px;background:${following ? 'transparent' : 'rgba(255,255,255,0.9)'};color:${following ? '#fff' : '#000'};border:1px solid rgba(255,255,255,0.4);border-radius:8px;cursor:pointer;font-size:12px;font-weight:500;">${following ? 'Entfolgen' : 'Folgen'}</button>` : ''}
+              <button id="btn-block" class="icon-btn icon-btn-sm" aria-label="${iBlocked ? 'Entblocken' : 'Blockieren'}" style="background:rgba(0,0,0,0.5);${iBlocked?'color:var(--danger);':''}">${iconSvg('ban', 14)}</button>
             ` : ''
           }
         </div>
@@ -1244,6 +1395,7 @@ async function showProfilePage(username) {
 
   // ── Basic Listeners ────────────────────────────────────────────────────────
   document.querySelector('#btn-back').addEventListener('click', () => navigate('/'))
+  document.querySelector('#btn-settings-link')?.addEventListener('click', () => navigate('/settings'))
   document.querySelector('#btn-info').addEventListener('click', () => {
     const p = document.querySelector('#info-panel')
     p.style.display = p.style.display === 'none' ? 'block' : 'none'
@@ -1331,8 +1483,12 @@ async function showProfilePage(username) {
   let currentImagePos = profile.header_image_position ? { ...profile.header_image_position } : { x: 50, y: 50, zoom: 1 }
   let currentPrivacy = profilePrivacy
 
-  document.querySelector('#btn-edit').addEventListener('click', () => { document.querySelector('#edit-modal').style.display = 'block' })
-  document.querySelector('#edit-close').addEventListener('click', () => { document.querySelector('#edit-modal').style.display = 'none' })
+  document.querySelector('#btn-edit')?.addEventListener('click', () => { document.querySelector('#edit-modal').style.display = 'block' })
+  document.querySelector('#edit-close')?.addEventListener('click', () => { document.querySelector('#edit-modal').style.display = 'none' })
+  if (isOwner && new URLSearchParams(location.search).get('edit') === '1') {
+    document.querySelector('#edit-modal').style.display = 'block'
+    history.replaceState({}, '', '/u/' + profile.username)
+  }
 
   document.querySelectorAll('.privacy-btn').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -1645,4 +1801,227 @@ function shuffleArray(arr) {
 
 function escapeHtml(str) {
   return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+}
+// ─── Settings Page ────────────────────────────────────────────────────────────
+
+async function showSettingsPage() {
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session) { showLogin(); return }
+  const { data: profile } = await supabase.from('profiles').select('*').eq('id', session.user.id).single()
+  if (!profile) { showLogin(); return }
+  currentProfile = profile
+
+  const navPref = getNavPref()
+  const profilePrivacy = profile.profile_privacy || 'public'
+
+  document.querySelector('#app').innerHTML = `
+    <div class="app-shell">
+      ${shellHtml('settings', profile)}
+      <main class="app-main">
+        <header class="topbar">
+          <button class="icon-btn icon-btn-sm" id="set-back" aria-label="Zurück">${iconSvg('chevL', 16)}</button>
+          <span style="font-size:16px;font-weight:600;">Einstellungen</span>
+        </header>
+
+        <div class="settings-wrap">
+
+          <section class="settings-section">
+            <h2>Account</h2>
+            <div class="settings-list">
+              <div class="settings-row" style="cursor:default;">
+                <span class="icon">${iconSvg('user', 18)}</span>
+                <div class="body">
+                  <div class="title">@${escapeHtml(profile.username)}</div>
+                  <div class="desc">${escapeHtml(session.user.email || '')}</div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="settings-section">
+            <h2>Profil</h2>
+            <div class="settings-list">
+              <button class="settings-row" id="set-edit-profile">
+                <span class="icon">${iconSvg('edit', 18)}</span>
+                <div class="body">
+                  <div class="title">Profil bearbeiten</div>
+                  <div class="desc">Display-Name, Bio, Header, Links</div>
+                </div>
+                <span class="chev">${iconSvg('chevR', 14)}</span>
+              </button>
+            </div>
+          </section>
+
+          <section class="settings-section">
+            <h2>Privacy</h2>
+            <div class="settings-list">
+              <div class="settings-row" style="cursor:default;flex-direction:column;align-items:stretch;">
+                <div style="display:flex;align-items:center;gap:12px;width:100%;">
+                  <span class="icon">${iconSvg('lock', 18)}</span>
+                  <div class="body">
+                    <div class="title">Profil-Sichtbarkeit</div>
+                    <div class="desc">Wer dein Profil und deine Posts sehen darf.</div>
+                  </div>
+                </div>
+                <div class="seg" style="margin-top:12px;" id="privacy-seg">
+                  <button class="seg-btn ${profilePrivacy==='public'?'active':''}" data-pv="public">🌍 Öffentlich</button>
+                  <button class="seg-btn ${profilePrivacy==='followers'?'active':''}" data-pv="followers">👥 Follower</button>
+                  <button class="seg-btn ${profilePrivacy==='private'?'active':''}" data-pv="private">🔒 Privat</button>
+                </div>
+              </div>
+              <button class="settings-row" id="set-blocks">
+                <span class="icon">${iconSvg('ban', 18)}</span>
+                <div class="body">
+                  <div class="title">Blockierte Nutzer</div>
+                  <div class="desc">Verwalte, wen du blockiert hast.</div>
+                </div>
+                <span class="chev">${iconSvg('chevR', 14)}</span>
+              </button>
+            </div>
+          </section>
+
+          <section class="settings-section">
+            <h2>Layout</h2>
+            <div class="settings-list">
+              <div class="settings-row" style="cursor:default;flex-direction:column;align-items:stretch;">
+                <div style="display:flex;align-items:center;gap:12px;width:100%;">
+                  <span class="icon">${iconSvg('layout', 18)}</span>
+                  <div class="body">
+                    <div class="title">Navigation</div>
+                    <div class="desc">Wo soll die Hauptnavigation erscheinen?</div>
+                  </div>
+                </div>
+                <div class="seg" style="margin-top:12px;" id="nav-seg">
+                  <button class="seg-btn ${navPref==='auto'?'active':''}" data-nav="auto">Auto</button>
+                  <button class="seg-btn ${navPref==='sidebar'?'active':''}" data-nav="sidebar">Sidebar</button>
+                  <button class="seg-btn ${navPref==='bottom'?'active':''}" data-nav="bottom">Bottom</button>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="settings-section">
+            <h2>Account</h2>
+            <div class="settings-list">
+              <button class="settings-row danger" id="set-logout">
+                <span class="icon">${iconSvg('logOut', 18)}</span>
+                <div class="body">
+                  <div class="title">Ausloggen</div>
+                </div>
+              </button>
+            </div>
+          </section>
+
+        </div>
+      </main>
+    </div>
+
+    <div id="blocks-host"></div>
+  `
+
+  wireShellNav(profile)
+  // notif badge needs the count refreshed for sidebar
+  refreshNotifBadge(profile.id).catch(()=>{})
+
+  document.querySelector('#set-back').onclick = () => navigate('/')
+  document.querySelector('#set-edit-profile').onclick = () => navigate('/u/' + profile.username + '?edit=1')
+
+  // Privacy
+  document.querySelectorAll('#privacy-seg .seg-btn').forEach(btn => {
+    btn.onclick = async () => {
+      const v = btn.dataset.pv
+      document.querySelectorAll('#privacy-seg .seg-btn').forEach(b => b.classList.toggle('active', b === btn))
+      const { error } = await supabase.from('profiles').update({ profile_privacy: v }).eq('id', profile.id)
+      if (error) console.error('privacy update', error)
+    }
+  })
+
+  // Nav preference
+  document.querySelectorAll('#nav-seg .seg-btn').forEach(btn => {
+    btn.onclick = () => {
+      document.querySelectorAll('#nav-seg .seg-btn').forEach(b => b.classList.toggle('active', b === btn))
+      setNavPref(btn.dataset.nav)
+    }
+  })
+
+  // Blocks
+  document.querySelector('#set-blocks').onclick = () => openBlocksModal(profile.id)
+
+  // Logout
+  document.querySelector('#set-logout').onclick = async () => {
+    if (realtimeChannel) { await supabase.removeChannel(realtimeChannel); realtimeChannel = null }
+    if (notifChannel) { await supabase.removeChannel(notifChannel); notifChannel = null }
+    await supabase.auth.signOut(); navigate('/')
+  }
+}
+
+async function openBlocksModal(userId) {
+  const host = document.querySelector('#blocks-host')
+  const { data: blocks } = await supabase.from('blocks').select('blocked_id, created_at').eq('blocker_id', userId).order('created_at', { ascending: false })
+  let rows = '<p style="color:var(--text-mute);font-size:13px;padding:16px;">Niemand blockiert.</p>'
+  if (blocks?.length) {
+    const ids = blocks.map(b => b.blocked_id)
+    const { data: profs } = await supabase.from('profiles').select('id, username, display_name').in('id', ids)
+    const m = Object.fromEntries((profs||[]).map(p => [p.id, p]))
+    rows = blocks.map(b => {
+      const p = m[b.blocked_id]; if (!p) return ''
+      return `
+        <div class="settings-row" style="cursor:default;">
+          <span class="icon">${iconSvg('user', 18)}</span>
+          <div class="body">
+            <div class="title">@${escapeHtml(p.username)}</div>
+            ${p.display_name ? `<div class="desc">${escapeHtml(p.display_name)}</div>` : ''}
+          </div>
+          <button class="btn" data-unblock="${p.id}">Entblocken</button>
+        </div>`
+    }).join('')
+  }
+  host.innerHTML = `
+    <div class="modal-overlay show" id="blk-overlay"></div>
+    <div class="modal show" role="dialog" aria-label="Blockierte Nutzer">
+      <div class="modal-head">
+        <span class="modal-title">Blockierte Nutzer</span>
+        <button class="icon-btn icon-btn-sm" id="blk-close">${iconSvg('x', 16)}</button>
+      </div>
+      <div class="modal-body" style="padding:8px;">
+        <div class="settings-list">${rows}</div>
+      </div>
+    </div>`
+  document.body.classList.add('no-scroll')
+  const close = () => { host.innerHTML = ''; document.body.classList.remove('no-scroll') }
+  document.querySelector('#blk-close').onclick = close
+  document.querySelector('#blk-overlay').onclick = close
+  host.querySelectorAll('[data-unblock]').forEach(btn => {
+    btn.onclick = async () => {
+      btn.disabled = true
+      const id = btn.dataset.unblock
+      const { error } = await supabase.from('blocks').delete().eq('blocker_id', userId).eq('blocked_id', id)
+      if (error) { console.error(error); btn.disabled = false; return }
+      close(); openBlocksModal(userId)
+    }
+  })
+}
+
+// ─── Explore Page (placeholder) ──────────────────────────────────────────────
+
+async function showExplorePage() {
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session) { showLogin(); return }
+  const profile = currentProfile || (await supabase.from('profiles').select('*').eq('id', session.user.id).single()).data
+  if (!profile) { showLogin(); return }
+  currentProfile = profile
+  document.querySelector('#app').innerHTML = `
+    <div class="app-shell">
+      ${shellHtml('explore', profile)}
+      <main class="app-main">
+        <header class="topbar">
+          <span style="font-size:16px;font-weight:600;">Explore</span>
+        </header>
+        <div style="max-width:640px;margin:0 auto;padding:40px 24px;text-align:center;color:var(--text-mute);font-size:14px;">
+          Explore-Feed kommt bald — hier siehst du dann öffentliche Posts von Leuten, denen du noch nicht folgst.
+        </div>
+      </main>
+    </div>`
+  wireShellNav(profile)
+  refreshNotifBadge(profile.id).catch(()=>{})
 }
