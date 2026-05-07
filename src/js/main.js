@@ -49,7 +49,9 @@ function showLogin() {
     const email = document.querySelector('#email').value.trim()
     const password = document.querySelector('#password').value.trim()
     const msg = document.querySelector('#msg')
-    msg.textContent = 'Lädt...'
+    if (!email || !password) { msg.textContent = 'Email und Passwort eingeben'; return }
+    if (!email || !password) { msg.textContent = 'Email und Passwort eingeben'; return }
+    msg.textContent = 'Lädt..
     const { error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) { msg.textContent = error.message; return }
     init()
