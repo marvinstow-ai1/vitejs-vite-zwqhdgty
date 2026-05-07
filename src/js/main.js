@@ -367,7 +367,7 @@ function wireComposer(profile) {
     const { error } = await supabase.from('posts').insert({ user_id: profile.id, media_url: mediaUrl, media_type: mediaType, mood, visibility: postVisibility })
     if (error) { msg.textContent = error.message; return }
     msg.textContent = '✓ Gepostet!'
-    setTimeout(() => { closeComposerModal(); if (location.pathname === '/') { activeMood = null; loadMoodChips(profile.id); loadPosts(profile.id) } }, 600)
+    setTimeout(() => { closeComposerModal(); if (location.pathname.startsWith('/u/' + profile.username)) showProfilePage(profile.username) }, 600)
   })
 }
 
@@ -726,15 +726,16 @@ async function showFeed(profile) {
 
         <div id="story-bar" style="display:flex;gap:12px;padding:14px 16px;overflow-x:auto;border-bottom:1px solid var(--border);scrollbar-width:none;-webkit-overflow-scrolling:touch;"></div>
 
-        <div style="max-width:1200px;margin:0 auto;padding:14px 16px 8px;">
-          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-            <button id="filter-all" style="padding:6px 14px;background:#fff;color:#000;border:none;border-radius:20px;font-size:12px;font-weight:500;cursor:pointer;white-space:nowrap;">Alle</button>
-            <div id="mood-chips" style="display:flex;gap:6px;flex-wrap:wrap;"></div>
+        <div style="max-width:560px;margin:0 auto;padding:64px 24px 48px;text-align:center;">
+          <div style="font-size:36px;margin-bottom:14px;">🌱</div>
+          <h2 style="color:#fff;font-size:18px;font-weight:500;margin:0 0 8px;">Willkommen, @${profile.username}</h2>
+          <p style="color:#666;font-size:13px;line-height:1.6;margin:0 0 24px;">
+            Posts und Reposts findest du auf deinem Profil und auf den Profilen, denen du folgst. Hier oben siehst du Stories, Suche und Benachrichtigungen.
+          </p>
+          <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
+            <button id="cta-profile" style="padding:9px 18px;background:#fff;color:#000;border:none;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;">Mein Profil</button>
+            <button id="cta-explore" style="padding:9px 18px;background:transparent;color:#ccc;border:1px solid #2a2a2a;border-radius:8px;font-size:13px;cursor:pointer;">Entdecken</button>
           </div>
-        </div>
-
-        <div id="feed-grid" style="max-width:1200px;margin:0 auto;padding:8px 16px 24px;columns:3 180px;gap:10px;">
-          <p style="color:#444;font-size:14px;">Lädt...</p>
         </div>
       </main>
     </div>
@@ -770,11 +771,8 @@ async function showFeed(profile) {
     const si = document.querySelector('#search-input'), sd = document.querySelector('#search-dropdown')
     if (si && sd && !si.contains(e.target) && !sd.contains(e.target)) sd.style.display = 'none'
   })
-  document.querySelector('#filter-all').addEventListener('click', () => { activeMood = null; updateFilterUI(); loadPosts(profile.id) })
-
-  await loadMoodChips(profile.id)
-  await loadPosts(profile.id)
-  setupRealtimeLikes(profile.id)
+  document.querySelector('#cta-profile')?.addEventListener('click', () => navigate('/u/' + profile.username))
+  document.querySelector('#cta-explore')?.addEventListener('click', () => navigate('/explore'))
 }
 
 function closeCommentsModal() {
@@ -1005,6 +1003,11 @@ async function handleRepost(btn, currentUserId) {
   if (reposted) {
     btn.dataset.reposted = 'false'; btn.style.color = '#555'
     if (countEl) countEl.textContent = Math.max(0, current - 1)
+    const repostsBoardId = await getOrCreateRepostsBoardId(currentUserId)
+    if (repostsBoardId) {
+      await supabase.from('board_posts').delete()
+        .eq('board_id', repostsBoardId).eq('post_id', postId).eq('user_id', currentUserId)
+    }
     const { error } = await supabase.from('reposts').delete().eq('post_id', postId).eq('user_id', currentUserId)
     if (error) { btn.dataset.reposted = 'true'; btn.style.color = '#06d6a0'; if (countEl) countEl.textContent = current }
     return
@@ -1012,22 +1015,44 @@ async function handleRepost(btn, currentUserId) {
 
   if (ownerId === currentUserId) return
 
-  const { data: boards } = await supabase.from('boards').select('id, title, visibility').eq('user_id', currentUserId).order('position', { ascending: true })
-  openRepostModal(boards || [], async (boardId) => {
+  const { data: boards } = await supabase.from('boards')
+    .select('id, title, visibility')
+    .eq('user_id', currentUserId)
+    .order('position', { ascending: true })
+  openRepostModal(boards || [], async ({ boardId, showOnProfile }) => {
     btn.dataset.reposted = 'true'; btn.style.color = '#06d6a0'
     if (countEl) countEl.textContent = current + 1
-    const { error: repErr } = await supabase.from('reposts').insert({ post_id: postId, user_id: currentUserId })
+    const { error: repErr } = await supabase.from('reposts')
+      .insert({ post_id: postId, user_id: currentUserId, show_on_profile: showOnProfile })
     if (repErr && repErr.code !== '23505') {
       btn.dataset.reposted = 'false'; btn.style.color = '#555'
       if (countEl) countEl.textContent = current
       console.error('repost insert failed', repErr); return
     }
-    if (boardId) {
-      const { error: bpErr } = await supabase.from('board_posts').insert({ board_id: boardId, post_id: postId, user_id: currentUserId })
+    const repostsBoardId = await getOrCreateRepostsBoardId(currentUserId)
+    if (repostsBoardId) {
+      const { error: rbErr } = await supabase.from('board_posts')
+        .insert({ board_id: repostsBoardId, post_id: postId, user_id: currentUserId })
+      if (rbErr && rbErr.code !== '23505') console.error('reposts board insert failed', rbErr)
+    }
+    if (boardId && boardId !== repostsBoardId) {
+      const { error: bpErr } = await supabase.from('board_posts')
+        .insert({ board_id: boardId, post_id: postId, user_id: currentUserId })
       if (bpErr && bpErr.code !== '23505') console.error('board_posts insert failed', bpErr)
     }
     if (ownerId) await createNotification(ownerId, currentUserId, 'repost', postId)
   })
+}
+
+async function getOrCreateRepostsBoardId(userId) {
+  const { data: existing } = await supabase.from('boards')
+    .select('id').eq('user_id', userId).eq('title', 'Reposts').maybeSingle()
+  if (existing?.id) return existing.id
+  const { data: created, error } = await supabase.from('boards')
+    .insert({ user_id: userId, title: 'Reposts', visibility: 'public', position: 999 })
+    .select('id').single()
+  if (error) { console.error('create reposts board failed', error); return null }
+  return created.id
 }
 
 function openRepostModal(boards, onConfirm) {
@@ -1035,27 +1060,49 @@ function openRepostModal(boards, onConfirm) {
   const modal = document.createElement('div')
   modal.id = 'repost-modal'
   modal.style.cssText = 'position:fixed;inset:0;z-index:350;background:rgba(0,0,0,0.92);display:flex;align-items:center;justify-content:center;'
-  const boardListHtml = boards.length
-    ? boards.map(b => `<button class="repost-board-pick" data-board-id="${b.id}" style="display:block;width:100%;text-align:left;padding:10px 12px;margin-bottom:6px;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:8px;color:#ddd;font-size:13px;cursor:pointer;">${escapeHtml(b.title)} ${b.visibility === 'private' ? '🔒' : b.visibility === 'followers' ? '👥' : ''}</button>`).join('')
-    : `<p style="color:#666;font-size:12px;margin:0 0 8px;">Du hast noch keine Boards. Du kannst auch ohne Board reposten.</p>`
+  const selectableBoards = boards.filter(b => b.title !== 'Reposts')
+  const boardOptionsHtml = selectableBoards.length
+    ? `<div style="max-height:32vh;overflow-y:auto;margin-bottom:10px;">
+         <button type="button" class="repost-board-pick selected" data-board-id="" style="display:block;width:100%;text-align:left;padding:10px 12px;margin-bottom:6px;background:#222;border:1px solid #fff;border-radius:8px;color:#fff;font-size:13px;cursor:pointer;">Nur "Reposts"-Board</button>
+         ${selectableBoards.map(b => `<button type="button" class="repost-board-pick" data-board-id="${b.id}" style="display:block;width:100%;text-align:left;padding:10px 12px;margin-bottom:6px;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:8px;color:#ddd;font-size:13px;cursor:pointer;">+ ${escapeHtml(b.title)} ${b.visibility === 'private' ? '🔒' : b.visibility === 'followers' ? '👥' : ''}</button>`).join('')}
+       </div>`
+    : `<p style="color:#666;font-size:12px;margin:0 0 12px;">Wird in dein automatisches "Reposts"-Board gelegt. Erstelle eigene Boards auf deinem Profil, um zusätzlich dort zu reposten.</p>`
   modal.innerHTML = `
     <div style="background:#111;border:1px solid #222;border-radius:14px;width:100%;max-width:380px;padding:20px;margin:16px;box-sizing:border-box;">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
-        <span style="color:#fff;font-size:14px;font-weight:500;">Reposten in...</span>
-        <button id="repost-close" style="background:none;border:none;color:#555;font-size:22px;cursor:pointer;line-height:1;">×</button>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+        <span style="color:#fff;font-size:14px;font-weight:500;">Reposten</span>
+        <button type="button" id="repost-close" style="background:none;border:none;color:#555;font-size:22px;cursor:pointer;line-height:1;">×</button>
       </div>
-      <div style="max-height:50vh;overflow-y:auto;margin-bottom:10px;">${boardListHtml}</div>
-      <button id="repost-no-board" style="display:block;width:100%;padding:10px 12px;background:transparent;border:1px dashed #333;border-radius:8px;color:#888;font-size:12px;cursor:pointer;margin-bottom:6px;">Ohne Board reposten</button>
-      <button id="repost-cancel" style="display:block;width:100%;padding:10px;background:transparent;border:none;color:#555;font-size:12px;cursor:pointer;">Abbrechen</button>
+      <p style="color:#666;font-size:12px;margin:0 0 12px;">Landet automatisch in deinem "Reposts"-Board. Optional zusätzlich in einem anderen Board.</p>
+      ${boardOptionsHtml}
+      <label style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:8px;margin-bottom:12px;cursor:pointer;">
+        <input id="repost-show-on-profile" type="checkbox" checked style="width:16px;height:16px;cursor:pointer;accent-color:#06d6a0;" />
+        <span style="font-size:13px;color:#ddd;">Auf meinem Profil zeigen</span>
+      </label>
+      <div style="display:flex;gap:8px;">
+        <button type="button" id="repost-cancel" style="flex:1;padding:10px;background:transparent;border:1px solid #2a2a2a;border-radius:8px;color:#888;font-size:13px;cursor:pointer;">Abbrechen</button>
+        <button type="button" id="repost-confirm" style="flex:2;padding:10px;background:#fff;color:#000;border:none;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;">Reposten</button>
+      </div>
     </div>`
   document.body.appendChild(modal)
+  let selectedBoardId = ''
   const close = () => modal.remove()
   modal.querySelector('#repost-close').addEventListener('click', close)
   modal.querySelector('#repost-cancel').addEventListener('click', close)
   modal.addEventListener('click', e => { if (e.target === modal) close() })
-  modal.querySelector('#repost-no-board').addEventListener('click', () => { close(); onConfirm(null) })
   modal.querySelectorAll('.repost-board-pick').forEach(b => {
-    b.addEventListener('click', () => { close(); onConfirm(b.dataset.boardId) })
+    b.addEventListener('click', () => {
+      selectedBoardId = b.dataset.boardId || ''
+      modal.querySelectorAll('.repost-board-pick').forEach(x => {
+        x.style.background = '#1a1a1a'; x.style.border = '1px solid #2a2a2a'; x.style.color = '#ddd'
+      })
+      b.style.background = '#222'; b.style.border = '1px solid #fff'; b.style.color = '#fff'
+    })
+  })
+  modal.querySelector('#repost-confirm').addEventListener('click', () => {
+    const showOnProfile = modal.querySelector('#repost-show-on-profile').checked
+    close()
+    onConfirm({ boardId: selectedBoardId || null, showOnProfile })
   })
 }
 
@@ -1177,17 +1224,38 @@ async function showProfilePage(username) {
 
   const canSeeBoard = !iBlocked && (isOwner || profilePrivacy === 'public' || (profilePrivacy === 'followers' && following))
 
-  const { data: allPosts } = await supabase.from('posts').select('id, media_url, mood, media_type, visibility, user_id').eq('user_id', profile.id).order('created_at', { ascending: false })
+  const { data: ownPosts } = await supabase.from('posts').select('id, media_url, mood, media_type, visibility, user_id').eq('user_id', profile.id).order('created_at', { ascending: false })
   const { count: followerCount } = await supabase.from('friendships').select('*', { count: 'exact', head: true }).eq('friend_id', profile.id).eq('status', 'accepted')
   const { count: followingCount } = await supabase.from('friendships').select('*', { count: 'exact', head: true }).eq('user_id', profile.id).eq('status', 'accepted')
 
   // Boards laden
   const { data: boards } = await supabase.from('boards').select('*').eq('user_id', profile.id).order('position', { ascending: true })
 
+  // Reposts dieses Profils, die auch im Profil-Feed gezeigt werden sollen
+  let repostedPosts = []
+  if (canSeeBoard) {
+    const { data: repostRows } = await supabase.from('reposts')
+      .select('post_id, created_at, posts(id, media_url, mood, media_type, visibility, user_id)')
+      .eq('user_id', profile.id)
+      .eq('show_on_profile', true)
+      .order('created_at', { ascending: false })
+    repostedPosts = (repostRows || []).map(r => r.posts).filter(Boolean)
+  }
+
+  // Welche Posts hat der aktuelle Viewer schon repostet?
+  let viewerRepostedSet = new Set()
+  if (currentUserId && !isOwner) {
+    const { data: myReposts } = await supabase.from('reposts').select('post_id').eq('user_id', currentUserId)
+    viewerRepostedSet = new Set((myReposts || []).map(r => r.post_id))
+  }
+
   let boardPosts = []
-  if (canSeeBoard && allPosts) {
-    const visibleIds = await getVisiblePostIds(allPosts, currentUserId)
-    boardPosts = allPosts.filter(p => visibleIds.has(p.id))
+  if (canSeeBoard) {
+    const merged = [...(ownPosts || []), ...repostedPosts]
+    const seen = new Set()
+    const dedup = merged.filter(p => p && !seen.has(p.id) && (seen.add(p.id), true))
+    const visibleIds = await getVisiblePostIds(dedup, currentUserId)
+    boardPosts = dedup.filter(p => visibleIds.has(p.id))
   }
 
   let profileStories = []
@@ -1284,7 +1352,7 @@ async function showProfilePage(username) {
         <div id="board-content">
           <!-- Default: alle Posts -->
           <div style="columns:3 100px;gap:3px;padding:3px;">
-            ${shuffled.map(post => renderBoardPost(post, isOwner)).join('')}
+            ${shuffled.map(post => renderBoardPost(post, isOwner, { viewerId: currentUserId, viewerReposted: viewerRepostedSet.has(post.id) })).join('')}
             ${!shuffled.length ? `<p style="color:#333;font-size:14px;padding:40px;">Noch keine Posts.</p>` : ''}
           </div>
         </div>
@@ -1461,13 +1529,16 @@ async function showProfilePage(username) {
         const boardId = tab.dataset.board
         const content = document.querySelector('#board-content')
         if (boardId === 'all') {
-          content.innerHTML = `<div style="columns:3 100px;gap:3px;padding:3px;">${shuffled.map(post => renderBoardPost(post, isOwner)).join('') || '<p style="color:#333;font-size:14px;padding:40px;">Noch keine Posts.</p>'}</div>`
+          content.innerHTML = `<div style="columns:3 100px;gap:3px;padding:3px;">${shuffled.map(post => renderBoardPost(post, isOwner, { viewerId: currentUserId, viewerReposted: viewerRepostedSet.has(post.id) })).join('') || '<p style="color:#333;font-size:14px;padding:40px;">Noch keine Posts.</p>'}</div>`
+          wireBoardRepostButtons(currentUserId)
         } else {
           content.innerHTML = `<p style="padding:24px;color:#444;font-size:13px;">Lädt...</p>`
           await loadBoardContent(boardId, content, isOwner, currentUserId, boards, profile.username)
         }
       })
     })
+
+    wireBoardRepostButtons(currentUserId)
 
     // ── New Board Button ───────────────────────────────────────────────────
     document.querySelector('#btn-new-board')?.addEventListener('click', () => openBoardModal(null, currentUserId, profile.username))
@@ -1588,6 +1659,13 @@ async function loadBoardContent(boardId, container, isOwner, currentUserId, boar
   const visibleIds = await getVisiblePostIds(posts, currentUserId)
   const visible = posts.filter(p => visibleIds.has(p.id))
 
+  let viewerRepostedSet = new Set()
+  if (currentUserId && !isOwner && visible.length) {
+    const { data: myReposts } = await supabase.from('reposts')
+      .select('post_id').eq('user_id', currentUserId).in('post_id', visible.map(p => p.id))
+    viewerRepostedSet = new Set((myReposts || []).map(r => r.post_id))
+  }
+
   const visIcon = board.visibility === 'private' ? '🔒' : board.visibility === 'followers' ? '👥' : '🌍'
 
   container.innerHTML = `
@@ -1610,7 +1688,7 @@ async function loadBoardContent(boardId, container, isOwner, currentUserId, boar
     </div>
     ${board.playlist_url ? `<div class="board-music-panel" style="display:none;padding:0 16px;margin-top:12px;"></div>` : ''}
     <div style="columns:3 100px;gap:3px;padding:3px;margin-top:12px;">
-      ${visible.map(post => renderBoardPost(post, isOwner)).join('')}
+      ${visible.map(post => renderBoardPost(post, isOwner, { viewerId: currentUserId, viewerReposted: viewerRepostedSet.has(post.id) })).join('')}
       ${!visible.length ? `<p style="color:#333;font-size:14px;padding:40px;">Dieses Board ist leer.</p>` : ''}
     </div>
     ${isOwner ? `
@@ -1621,6 +1699,8 @@ async function loadBoardContent(boardId, container, isOwner, currentUserId, boar
         <span id="board-add-msg" style="font-size:12px;color:#555;margin-left:8px;"></span>
       </div>` : ''}
   `
+
+  wireBoardRepostButtons(currentUserId)
 
   container.querySelector('.board-playlist-btn')?.addEventListener('click', e => {
     const panel = container.querySelector('.board-music-panel')
@@ -1725,18 +1805,30 @@ async function showBoardPage(username, boardId) {
 
 // ─── Render Board Post ────────────────────────────────────────────────────────
 
-function renderBoardPost(post, isOwner) {
+function renderBoardPost(post, isOwner, opts = {}) {
+  const { viewerId = null, viewerReposted = false } = opts
   const mt = post.media_type || detectMediaType(post.media_url)
   const vis = post.visibility || 'public'
   const badge = isOwner && vis !== 'public' ? `<div style="position:absolute;top:4px;left:4px;background:rgba(0,0,0,0.65);border-radius:8px;padding:2px 5px;font-size:10px;color:#ccc;">${vis === 'private' ? '🔒' : '👥'}</div>` : ''
+  const canRepost = !!viewerId && post.user_id !== viewerId
+  const repostBtn = canRepost ? `<button class="board-repost-btn" data-post-id="${post.id}" data-owner-id="${post.user_id}" data-reposted="${viewerReposted}" aria-label="Reposten" style="position:absolute;top:4px;right:4px;background:rgba(0,0,0,0.65);border:none;border-radius:50%;width:26px;height:26px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:${viewerReposted ? '#06d6a0' : '#fff'};font-size:13px;line-height:1;">🔁</button>` : ''
   if (mt === 'video' || mt === 'gif') {
-    return `<div style="break-inside:avoid;margin-bottom:3px;aspect-ratio:1;overflow:hidden;background:#111;position:relative;"><video src="${post.media_url}" style="width:100%;height:100%;object-fit:cover;" autoplay loop muted playsinline></video>${badge}</div>`
+    return `<div style="break-inside:avoid;margin-bottom:3px;aspect-ratio:1;overflow:hidden;background:#111;position:relative;"><video src="${post.media_url}" style="width:100%;height:100%;object-fit:cover;" autoplay loop muted playsinline></video>${badge}${repostBtn}</div>`
   }
   if (mt === 'youtube') {
     const embedUrl = getYouTubeEmbedUrl(post.media_url)
-    return `<div style="break-inside:avoid;margin-bottom:3px;position:relative;padding-bottom:100%;overflow:hidden;background:#111;"><iframe src="${embedUrl}" style="position:absolute;inset:0;width:100%;height:100%;border:none;" allow="autoplay;encrypted-media" allowfullscreen></iframe>${badge}</div>`
+    return `<div style="break-inside:avoid;margin-bottom:3px;position:relative;padding-bottom:100%;overflow:hidden;background:#111;"><iframe src="${embedUrl}" style="position:absolute;inset:0;width:100%;height:100%;border:none;" allow="autoplay;encrypted-media" allowfullscreen></iframe>${badge}${repostBtn}</div>`
   }
-  return `<div style="break-inside:avoid;margin-bottom:3px;aspect-ratio:1;overflow:hidden;background:#111;position:relative;"><img src="${post.media_url}" alt="" style="width:100%;height:100%;object-fit:cover;display:block;" loading="lazy" onerror="this.style.display='none'" />${badge}</div>`
+  return `<div style="break-inside:avoid;margin-bottom:3px;aspect-ratio:1;overflow:hidden;background:#111;position:relative;"><img src="${post.media_url}" alt="" style="width:100%;height:100%;object-fit:cover;display:block;" loading="lazy" onerror="this.style.display='none'" />${badge}${repostBtn}</div>`
+}
+
+function wireBoardRepostButtons(currentUserId) {
+  if (!currentUserId) return
+  document.querySelectorAll('.board-repost-btn').forEach(btn => {
+    if (btn.dataset.wired === '1') return
+    btn.dataset.wired = '1'
+    btn.addEventListener('click', e => { e.stopPropagation(); handleRepost(btn, currentUserId) })
+  })
 }
 
 // ─── Img Drag ─────────────────────────────────────────────────────────────────
