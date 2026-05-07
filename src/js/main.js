@@ -50,8 +50,7 @@ function showLogin() {
     const password = document.querySelector('#password').value.trim()
     const msg = document.querySelector('#msg')
     if (!email || !password) { msg.textContent = 'Email und Passwort eingeben'; return }
-    if (!email || !password) { msg.textContent = 'Email und Passwort eingeben'; return }
-    msg.textContent = 'Lädt..
+    msg.textContent = 'Lädt...'
     const { error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) { msg.textContent = error.message; return }
     init()
@@ -294,7 +293,8 @@ function openAddStoryModal(currentUserId) {
     if (!uploadedUrl) { msg.textContent = 'Erst Datei hochladen'; return }
     const mood = modal.querySelector('#story-mood').value.trim().replace(/^#+/, '').toLowerCase() || null
     msg.textContent = 'Posten...'
-    const { error } = await supabase.from('stories').insert({ user_id: currentUserId, media_url: uploadedUrl, media_type: uploadedType, mood })
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+    const { error } = await supabase.from('stories').insert({ user_id: currentUserId, media_url: uploadedUrl, media_type: uploadedType, mood, expires_at: expiresAt })
     if (error) { msg.textContent = '❌ ' + error.message; return }
     modal.remove()
     loadStoryBar(currentUserId)
@@ -774,11 +774,16 @@ async function createNotification(toUserId, fromUserId, type, postId = null) {
 async function loadPosts(currentUserId) {
   const grid = document.querySelector('#feed-grid')
   if (!grid) return
-  let query = supabase.from('posts').select('*').order('created_at', { ascending: false }).limit(120)
+  const followedSet = await getFollowedIds(currentUserId)
+  const allowedIds = [currentUserId, ...followedSet]
+  let query = supabase.from('posts').select('*').in('user_id', allowedIds).order('created_at', { ascending: false }).limit(120)
   if (activeMood) query = query.eq('mood', activeMood)
   const { data: allPosts, error } = await query
   if (error) { grid.innerHTML = `<p style="color:#666;">Fehler: ${error.message}</p>`; return }
-  if (!allPosts?.length) { grid.innerHTML = `<p style="color:#333;font-size:14px;">${activeMood ? `Keine Posts mit #${activeMood}.` : 'Noch keine Posts.'}</p>`; return }
+  if (!allPosts?.length) {
+    const empty = activeMood ? `Keine Posts mit #${activeMood}.` : (followedSet.size ? 'Noch keine Posts von dir oder den Leuten, denen du folgst.' : 'Noch keine Posts. Folge anderen Usern, um deren Posts hier zu sehen.')
+    grid.innerHTML = `<p style="color:#333;font-size:14px;">${empty}</p>`; return
+  }
   const visibleIds = await getVisiblePostIds(allPosts, currentUserId)
   const posts = allPosts.filter(p => visibleIds.has(p.id)).slice(0, 60)
   if (!posts.length) { grid.innerHTML = `<p style="color:#333;font-size:14px;">Keine sichtbaren Posts.</p>`; return }
@@ -846,16 +851,62 @@ async function loadPosts(currentUserId) {
 async function handleRepost(btn, currentUserId) {
   const postId = btn.dataset.postId, reposted = btn.dataset.reposted === 'true', ownerId = btn.dataset.ownerId
   const countEl = document.querySelector(`.repost-count[data-post-id="${postId}"]`), current = parseInt(countEl?.textContent || '0')
-  btn.dataset.reposted = !reposted; btn.style.color = !reposted ? '#06d6a0' : '#555'
-  if (countEl) countEl.textContent = !reposted ? current + 1 : Math.max(0, current - 1)
+
   if (reposted) {
+    btn.dataset.reposted = 'false'; btn.style.color = '#555'
+    if (countEl) countEl.textContent = Math.max(0, current - 1)
     const { error } = await supabase.from('reposts').delete().eq('post_id', postId).eq('user_id', currentUserId)
-    if (error) { btn.dataset.reposted = reposted; btn.style.color = '#06d6a0'; if (countEl) countEl.textContent = current }
-  } else {
-    const { error } = await supabase.from('reposts').insert({ post_id: postId, user_id: currentUserId })
-    if (error) { btn.dataset.reposted = reposted; btn.style.color = '#555'; if (countEl) countEl.textContent = current }
-    else if (ownerId) await createNotification(ownerId, currentUserId, 'repost', postId)
+    if (error) { btn.dataset.reposted = 'true'; btn.style.color = '#06d6a0'; if (countEl) countEl.textContent = current }
+    return
   }
+
+  if (ownerId === currentUserId) return
+
+  const { data: boards } = await supabase.from('boards').select('id, title, visibility').eq('user_id', currentUserId).order('position', { ascending: true })
+  openRepostModal(boards || [], async (boardId) => {
+    btn.dataset.reposted = 'true'; btn.style.color = '#06d6a0'
+    if (countEl) countEl.textContent = current + 1
+    const { error: repErr } = await supabase.from('reposts').insert({ post_id: postId, user_id: currentUserId })
+    if (repErr) {
+      btn.dataset.reposted = 'false'; btn.style.color = '#555'
+      if (countEl) countEl.textContent = current
+      console.error('repost insert failed', repErr); return
+    }
+    if (boardId) {
+      const { error: bpErr } = await supabase.from('board_posts').insert({ board_id: boardId, post_id: postId, user_id: currentUserId })
+      if (bpErr && bpErr.code !== '23505') console.error('board_posts insert failed', bpErr)
+    }
+    if (ownerId) await createNotification(ownerId, currentUserId, 'repost', postId)
+  })
+}
+
+function openRepostModal(boards, onConfirm) {
+  const existing = document.querySelector('#repost-modal'); if (existing) existing.remove()
+  const modal = document.createElement('div')
+  modal.id = 'repost-modal'
+  modal.style.cssText = 'position:fixed;inset:0;z-index:350;background:rgba(0,0,0,0.92);display:flex;align-items:center;justify-content:center;'
+  const boardListHtml = boards.length
+    ? boards.map(b => `<button class="repost-board-pick" data-board-id="${b.id}" style="display:block;width:100%;text-align:left;padding:10px 12px;margin-bottom:6px;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:8px;color:#ddd;font-size:13px;cursor:pointer;">${escapeHtml(b.title)} ${b.visibility === 'private' ? '🔒' : b.visibility === 'followers' ? '👥' : ''}</button>`).join('')
+    : `<p style="color:#666;font-size:12px;margin:0 0 8px;">Du hast noch keine Boards. Du kannst auch ohne Board reposten.</p>`
+  modal.innerHTML = `
+    <div style="background:#111;border:1px solid #222;border-radius:14px;width:100%;max-width:380px;padding:20px;margin:16px;box-sizing:border-box;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+        <span style="color:#fff;font-size:14px;font-weight:500;">Reposten in...</span>
+        <button id="repost-close" style="background:none;border:none;color:#555;font-size:22px;cursor:pointer;line-height:1;">×</button>
+      </div>
+      <div style="max-height:50vh;overflow-y:auto;margin-bottom:10px;">${boardListHtml}</div>
+      <button id="repost-no-board" style="display:block;width:100%;padding:10px 12px;background:transparent;border:1px dashed #333;border-radius:8px;color:#888;font-size:12px;cursor:pointer;margin-bottom:6px;">Ohne Board reposten</button>
+      <button id="repost-cancel" style="display:block;width:100%;padding:10px;background:transparent;border:none;color:#555;font-size:12px;cursor:pointer;">Abbrechen</button>
+    </div>`
+  document.body.appendChild(modal)
+  const close = () => modal.remove()
+  modal.querySelector('#repost-close').addEventListener('click', close)
+  modal.querySelector('#repost-cancel').addEventListener('click', close)
+  modal.addEventListener('click', e => { if (e.target === modal) close() })
+  modal.querySelector('#repost-no-board').addEventListener('click', () => { close(); onConfirm(null) })
+  modal.querySelectorAll('.repost-board-pick').forEach(b => {
+    b.addEventListener('click', () => { close(); onConfirm(b.dataset.boardId) })
+  })
 }
 
 // ─── Comments ─────────────────────────────────────────────────────────────────
@@ -1163,15 +1214,22 @@ async function showProfilePage(username) {
   // ── Follow ─────────────────────────────────────────────────────────────────
   document.querySelector('#btn-follow')?.addEventListener('click', async () => {
     const btn = document.querySelector('#btn-follow')
+    if (!currentUserId) return
+    btn.disabled = true
     if (following) {
-      await supabase.from('friendships').delete().eq('id', followId)
+      const { error } = await supabase.from('friendships').delete().eq('user_id', currentUserId).eq('friend_id', profile.id)
+      if (error) { console.error('unfollow failed', error); btn.disabled = false; return }
+      followId = null; following = false
       btn.textContent = 'Folgen'; btn.style.background = 'rgba(255,255,255,0.9)'; btn.style.color = '#000'
-      following = false
     } else {
-      const { data } = await supabase.from('friendships').insert({ user_id: currentUserId, friend_id: profile.id, status: 'accepted' }).select().single()
-      followId = data?.id; following = true
+      const { data, error } = await supabase.from('friendships')
+        .upsert({ user_id: currentUserId, friend_id: profile.id, status: 'accepted' }, { onConflict: 'user_id,friend_id' })
+        .select().single()
+      if (error) { console.error('follow failed', error); btn.disabled = false; return }
+      followId = data?.id || null; following = true
       btn.textContent = 'Entfolgen'; btn.style.background = 'transparent'; btn.style.color = '#fff'
     }
+    btn.disabled = false
   })
 
   // ── Board Tabs ─────────────────────────────────────────────────────────────
