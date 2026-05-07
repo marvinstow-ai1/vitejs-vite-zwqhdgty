@@ -1003,13 +1003,29 @@ async function showProfilePage(username) {
   const isOwner = currentUserId === profile.id
   const profilePrivacy = profile.profile_privacy || 'public'
   let following = false, followId = null
+  let iBlocked = false, iAmBlocked = false
 
   if (currentUserId && !isOwner) {
-    const { data: fw } = await supabase.from('friendships').select('id').eq('user_id', currentUserId).eq('friend_id', profile.id).eq('status', 'accepted').maybeSingle()
-    following = !!fw; followId = fw?.id || null
+    const [fwRes, bOutRes, bInRes] = await Promise.all([
+      supabase.from('friendships').select('id').eq('user_id', currentUserId).eq('friend_id', profile.id).eq('status', 'accepted').maybeSingle(),
+      supabase.from('blocks').select('id').eq('blocker_id', currentUserId).eq('blocked_id', profile.id).maybeSingle(),
+      supabase.from('blocks').select('id').eq('blocker_id', profile.id).eq('blocked_id', currentUserId).maybeSingle(),
+    ])
+    following = !!fwRes.data; followId = fwRes.data?.id || null
+    iBlocked = !!bOutRes.data
+    iAmBlocked = !!bInRes.data
   }
 
-  const canSeeBoard = isOwner || profilePrivacy === 'public' || (profilePrivacy === 'followers' && following)
+  if (iAmBlocked) {
+    app.innerHTML = `<div style="background:#0a0a0a;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:24px;">
+      <div style="font-size:42px;">🚫</div>
+      <p style="color:#555;font-size:14px;text-align:center;">Profil nicht verfügbar.</p>
+      <button onclick="history.back()" style="padding:8px 20px;background:transparent;color:#666;border:1px solid #333;border-radius:8px;cursor:pointer;font-size:13px;">Zurück</button>
+    </div>`
+    return
+  }
+
+  const canSeeBoard = !iBlocked && (isOwner || profilePrivacy === 'public' || (profilePrivacy === 'followers' && following))
 
   const { data: allPosts } = await supabase.from('posts').select('id, media_url, mood, media_type, visibility, user_id').eq('user_id', profile.id).order('created_at', { ascending: false })
   const { count: followerCount } = await supabase.from('friendships').select('*', { count: 'exact', head: true }).eq('friend_id', profile.id).eq('status', 'accepted')
@@ -1024,6 +1040,24 @@ async function showProfilePage(username) {
     boardPosts = allPosts.filter(p => visibleIds.has(p.id))
   }
 
+  let profileStories = []
+  if (canSeeBoard) {
+    const { data: s } = await supabase.from('stories')
+      .select('*, profiles(username)')
+      .eq('user_id', profile.id)
+      .gt('expires_at', new Date().toISOString())
+      .order('created_at', { ascending: true })
+    profileStories = s || []
+  }
+  const hasStories = profileStories.length > 0
+  let profileViewedSet = new Set()
+  if (hasStories && currentUserId) {
+    const { data: viewed } = await supabase.from('story_views')
+      .select('story_id').eq('user_id', currentUserId).in('story_id', profileStories.map(s => s.id))
+    profileViewedSet = new Set(viewed?.map(v => v.story_id) || [])
+  }
+  const hasUnseenStories = hasStories && profileStories.some(s => !profileViewedSet.has(s.id))
+
   const shuffled = profile.pinned_board_mood
     ? boardPosts.filter(p => p.mood === profile.pinned_board_mood)
     : shuffleArray(boardPosts)
@@ -1037,16 +1071,25 @@ async function showProfilePage(username) {
       <div style="position:relative;width:100%;height:260px;overflow:hidden;${headerStyle}">
         ${profile.header_type === 'image' && profile.header_image_url ? `<img src="${profile.header_image_url}" alt="" style="position:absolute;width:100%;height:100%;object-fit:cover;transform:translate(${(profile.header_image_position?.x||50)-50}%, ${(profile.header_image_position?.y||50)-50}%) scale(${profile.header_image_position?.zoom||1});transform-origin:center;" />` : ''}
         ${profile.header_type === 'pattern' ? `<div style="position:absolute;inset:0;${buildPatternStyle(profile.header_pattern)}opacity:0.25;"></div>` : ''}
-        <div style="position:absolute;top:20px;left:20px;z-index:2;max-width:60%;">
-          <div style="font-size:22px;font-weight:700;color:#fff;text-shadow:0 2px 8px rgba(0,0,0,0.8);">${escapeHtml(profile.display_name || profile.username)}</div>
-          ${profile.bio ? `<div style="font-size:13px;color:rgba(255,255,255,0.85);margin-top:6px;line-height:1.4;text-shadow:0 1px 4px rgba(0,0,0,0.7);">${escapeHtml(profile.bio)}</div>` : ''}
-          ${profilePrivacy !== 'public' ? `<div style="margin-top:8px;font-size:11px;color:rgba(255,255,255,0.5);">${profilePrivacy === 'private' ? '🔒 Privates Profil' : '👥 Nur Follower'}</div>` : ''}
+        <div style="position:absolute;top:20px;left:20px;z-index:2;max-width:65%;display:flex;align-items:flex-start;gap:12px;">
+          ${hasStories ? `
+            <div id="profile-story-ring" style="width:48px;height:48px;border-radius:50%;padding:2px;background:${hasUnseenStories ? 'linear-gradient(135deg,#ff4d6d,#ffd60a,#06d6a0)' : 'rgba(255,255,255,0.4)'};cursor:pointer;flex-shrink:0;">
+              <div style="width:100%;height:100%;border-radius:50%;background:#1a1a1a;display:flex;align-items:center;justify-content:center;font-size:18px;color:#fff;border:2px solid #0a0a0a;">${(profile.username || '?')[0].toUpperCase()}</div>
+            </div>` : ''}
+          <div style="min-width:0;">
+            <div style="font-size:22px;font-weight:700;color:#fff;text-shadow:0 2px 8px rgba(0,0,0,0.8);">${escapeHtml(profile.display_name || profile.username)}</div>
+            ${profile.bio ? `<div style="font-size:13px;color:rgba(255,255,255,0.85);margin-top:6px;line-height:1.4;text-shadow:0 1px 4px rgba(0,0,0,0.7);">${escapeHtml(profile.bio)}</div>` : ''}
+            ${profilePrivacy !== 'public' ? `<div style="margin-top:8px;font-size:11px;color:rgba(255,255,255,0.5);">${profilePrivacy === 'private' ? '🔒 Privates Profil' : '👥 Nur Follower'}</div>` : ''}
+          </div>
         </div>
-        <div style="position:absolute;top:16px;right:16px;z-index:2;display:flex;gap:8px;">
+        <div style="position:absolute;top:16px;right:16px;z-index:2;display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;max-width:55%;">
           <button id="btn-back" style="padding:6px 14px;background:rgba(0,0,0,0.5);color:#fff;border:1px solid rgba(255,255,255,0.2);border-radius:8px;cursor:pointer;font-size:12px;backdrop-filter:blur(8px);">← Feed</button>
           ${isOwner
             ? `<button id="btn-edit" style="padding:6px 14px;background:rgba(255,255,255,0.15);color:#fff;border:1px solid rgba(255,255,255,0.3);border-radius:8px;cursor:pointer;font-size:12px;backdrop-filter:blur(8px);">✏️ Edit</button>`
-            : currentUserId ? `<button id="btn-follow" style="padding:6px 14px;background:${following ? 'transparent' : 'rgba(255,255,255,0.9)'};color:${following ? '#fff' : '#000'};border:1px solid rgba(255,255,255,0.4);border-radius:8px;cursor:pointer;font-size:12px;">${following ? 'Entfolgen' : 'Folgen'}</button>` : ''
+            : currentUserId ? `
+              ${!iBlocked ? `<button id="btn-follow" style="padding:6px 14px;background:${following ? 'transparent' : 'rgba(255,255,255,0.9)'};color:${following ? '#fff' : '#000'};border:1px solid rgba(255,255,255,0.4);border-radius:8px;cursor:pointer;font-size:12px;">${following ? 'Entfolgen' : 'Folgen'}</button>` : ''}
+              <button id="btn-block" title="${iBlocked ? 'Entblocken' : 'Blockieren'}" style="padding:6px 10px;background:rgba(0,0,0,0.5);color:${iBlocked ? '#ff4d6d' : '#fff'};border:1px solid rgba(255,255,255,0.2);border-radius:8px;cursor:pointer;font-size:12px;backdrop-filter:blur(8px);">${iBlocked ? '🚫 Entblocken' : '🚫'}</button>
+            ` : ''
           }
         </div>
         <button id="btn-info" style="position:absolute;bottom:16px;left:16px;z-index:2;padding:6px 14px;background:rgba(0,0,0,0.5);color:#fff;border:1px solid rgba(255,255,255,0.2);border-radius:20px;cursor:pointer;font-size:12px;backdrop-filter:blur(8px);">
@@ -1231,6 +1274,30 @@ async function showProfilePage(username) {
       createNotification(profile.id, currentUserId, 'follow').catch(e => console.error('follow notif failed', e))
     }
     btn.disabled = false
+  })
+
+  // ── Block ──────────────────────────────────────────────────────────────────
+  document.querySelector('#btn-block')?.addEventListener('click', async () => {
+    if (!currentUserId) return
+    const btn = document.querySelector('#btn-block')
+    btn.disabled = true
+    if (iBlocked) {
+      const { error } = await supabase.from('blocks').delete().eq('blocker_id', currentUserId).eq('blocked_id', profile.id)
+      if (error) { console.error('unblock failed', error); btn.disabled = false; return }
+      showProfilePage(profile.username)
+    } else {
+      if (!confirm(`@${profile.username} blockieren? Ihr werdet euch gegenseitig nicht mehr sehen.`)) { btn.disabled = false; return }
+      await supabase.from('friendships').delete().or(`and(user_id.eq.${currentUserId},friend_id.eq.${profile.id}),and(user_id.eq.${profile.id},friend_id.eq.${currentUserId})`)
+      const { error } = await supabase.from('blocks').insert({ blocker_id: currentUserId, blocked_id: profile.id })
+      if (error && error.code !== '23505') { console.error('block failed', error); btn.disabled = false; return }
+      navigate('/')
+    }
+  })
+
+  // ── Story Ring ─────────────────────────────────────────────────────────────
+  document.querySelector('#profile-story-ring')?.addEventListener('click', () => {
+    if (!profileStories.length) return
+    openStoryViewer(profileStories, currentUserId, profileViewedSet, () => showProfilePage(profile.username))
   })
 
   // ── Board Tabs ─────────────────────────────────────────────────────────────
