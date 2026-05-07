@@ -9,7 +9,7 @@
 - [x] erste klare Page-Module anlegen (Feed, Profile, Explore, Settings, Board, Auth)
 - [x] Single-SPA-Grundstruktur vorbereiten
 - [x] Legacy-HTMLs (`feed.html`, `explore.html`, `profile.html`) entfernt — nur noch `index.html`
-- [ ] offene Produktentscheidung festziehen: `/` = Landing, Feed oder Redirect (Phase 6)
+- [x] Landing-Verhalten festgezogen: `/` = Home Feed für eingeloggte User, Login-Gate für Gäste
 
 ## Phase 2 — Service Layer / Datenzugriff
 
@@ -38,32 +38,22 @@
 - [x] komplettes RLS-Audit für alle genutzten Tabellen durchführen → `docs/PHASE3_RLS_AUDIT.md`
 - [x] Migrations-Entwurf für RLS + Schema-Härtung → `supabase/migrations/0001_phase3_rls.sql`
 - [x] Frontend-Sichtbarkeitslogik klar als UX-Filter markiert (`getVisiblePostIds`)
-- [x] Trusted-Action-Seam für Notifications (`services/notify.action.js`) — single point für Phase-7-Migration
-- [ ] Migration auf einer Supabase-Branch testen (manuell, nicht durch den Agent)
-- [ ] RLS aktivieren, Policy für Policy:
-  - [ ] profiles
-  - [ ] posts
-  - [ ] boards
-  - [ ] board_posts
-  - [ ] reposts
-  - [ ] stories
-  - [ ] story_views
-  - [ ] friendships
-  - [ ] blocks
-  - [ ] likes
-  - [ ] comments
-  - [ ] notifications
-- [ ] `posts.visibility` CHECK + Default + NOT NULL aktivieren
-- [ ] `reposts.show_on_profile` Default + NOT NULL nach Backfill
-- [ ] NULL-/Cascade-Verhalten bei Posts / Boards / Reposts / Zuordnungstabellen prüfen
-- [ ] Storage-Bucket-RLS für `images`, `videos`, `headers`, `stories` setzen
-- [ ] klären, ob `friendships` zu `follows` migriert oder erweitert werden soll (Phase 6 Antwort)
-- [ ] prüfen, ob Reposts + `board_posts` aktuell redundanten Zustand erzeugen
-- [ ] Like-/Comment-/Repost-/Board-Insert-Regeln an Post-Sichtbarkeit koppeln (im Migrations-Entwurf)
-- [ ] Story-View-Insert-Regeln an Story-Sichtbarkeit koppeln (im Migrations-Entwurf)
-- [ ] relevante Indexe für RLS-/Visibility-Queries prüfen (im Migrations-Entwurf)
-- [ ] `getVisiblePostIds()` entfernen, sobald RLS scharf
-- [ ] Notifications nicht mehr als reine Client-Vertrauenslogik (Phase 7 Edge Function)
+- [x] Trusted-Action-Seam für Notifications (`services/notify.action.js`)
+- [x] Live-State-Audit gegen tatsächlichen Stand der Supabase-Datenbank
+- [x] Apply-Plan dokumentiert (`docs/PHASE3_APPLY_PLAN.md`)
+- [x] Verification-Pass dokumentiert (`docs/PHASE3_VERIFICATION.md`)
+- [x] Step 1 angewendet: SECURITY-DEFINER-Helper (`is_following`, `is_blocked_either_way`, `can_view_post`) + RLS-Performance-Indexe → `phase3_visibility_helpers_and_indexes`
+- [x] Strikte Policies paste-ready vorbereitet → `supabase/migrations/0002_phase3_strict_policies.sql`
+- [x] Storage-Bucket-Lücke identifiziert (Upload-Policies ohne Pfadprüfung) → `supabase/migrations/0003_phase3_storage_policies.sql`
+- [ ] Step 2 anwenden: `0002_phase3_strict_policies.sql` durch Mensch reviewen + applizieren
+  - schließt Lücken in: `profiles`, `board_posts`, `reposts`, `likes`, `comments`, `story_views`, `notifications` (INSERT)
+  - bereits strikt (kein Handlungsbedarf): `posts_select_visibility`, `stories_select_visibility`, `boards`, `friendships` (own), `blocks_*_own`, `notifications` (SELECT/UPDATE/DELETE)
+- [ ] Step 3 anwenden: `0003_phase3_storage_policies.sql` (Pfad-Prefix-Check für Uploads)
+- [ ] Frontend-Sichtbarkeitslogik final entfernen (`getVisiblePostIds()`) — nach Step 2
+- [ ] Profilseite: graceful "Profil ist privat"-Zustand wenn `getProfileByUsername()` nach Step 2 `null` liefert
+- [ ] Follower-Counts auf fremden Profilen reparieren (eigenständiger Follow-up — durch `friendships`-SELECT-Policy heute auf 0/0 limitiert)
+- [ ] `posts.visibility` / `boards.visibility` / `profile_privacy` `NOT NULL` aktivieren nach Backfill
+- [ ] `moodboard`-Bucket-Permissive-Policies entfernen, falls nicht mehr in Benutzung
 
 ## Phase 4 — Kernfunktionen stabilisieren
 
@@ -93,13 +83,16 @@
 
 ## Phase 6 — Produktentscheidungen
 
-- [ ] Landing-Verhalten (`/`): Landing | Home Feed | Profil-Redirect
-- [ ] Social-Graph-Modell: echte Freundschaften | Follows | Follows + Requests
-- [ ] Messages-Scope: jetzt | Placeholder-Route | später
+- [x] Landing-Verhalten (`/`): Home Feed für eingeloggte User, Login-Gate für Gäste
+- [x] Social-Graph-Modell: Follows + Follow-Requests für private Profile
+- [x] Messages-Scope: nur Placeholder-Route bei `/messages`
+- [ ] Follow-Request-UI (Pending / Withdraw / Accept-Reject) ergänzen
+- [ ] Auto-Accept-Trigger für öffentliche Profile DB-seitig
+- [ ] Messages-Navigation erst zeigen, wenn echte Funktion folgt
 
 ## Phase 7 — Trusted Actions / Edge Functions
 
-- [ ] Notification-Erstellung als Edge Function (Body von `notifyAction()` ersetzen)
+- [ ] Notification-Erstellung als Edge Function (Body von `notifyAction()` ersetzen) — danach `notifications_insert`-Policy entfernen
 - [ ] Follow/Unfollow/Block-Side-Effects prüfen
 - [ ] Repost-Ablauf atomar (`reposts` + `board_posts` + Notification)
 - [ ] Story-Publishing / Story-Expiry serverseitig (pg_cron oder Edge)
@@ -108,7 +101,7 @@
 ## Phase 8 — Cleanup / Tech Debt
 
 - [ ] `interactions.service.js#createNotification` Re-Export entfernen, sobald keine Aufrufer
-- [ ] `getVisiblePostIds()` entfernen, sobald RLS aktiv
+- [ ] `getVisiblePostIds()` entfernen, sobald RLS Step 2 aktiv
 - [ ] leere / nicht genutzte Dateien prüfen
 - [ ] zirkuläre Import-Risiken vermeiden
 - [ ] Modal-Logik aus `feed.page.js` in gemeinsame Schicht
