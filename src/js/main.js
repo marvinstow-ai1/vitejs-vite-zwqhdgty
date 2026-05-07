@@ -9,6 +9,7 @@ import { showProfilePage } from './pages/profile.page.js'
 import { showExplorePage } from './pages/explore.page.js'
 import { showSettingsPage } from './pages/settings.page.js'
 import { showBoardPage } from './pages/board.page.js'
+import { showMessagesPage } from './pages/messages.page.js'
 import { openRepostModal } from './pages/feed.page.js'
 
 // ─── App-level state ──────────────────────────────────────────────────────────
@@ -96,6 +97,16 @@ registerHandlers({
       navigate,
       openRepostModal: (boards, cb) => openRepostModal(boards, cb),
     })
+  },
+
+  async messages() {
+    const session = await getSession()
+    if (!session) { showLogin(init); return }
+    if (!currentProfile) {
+      currentProfile = await getProfileById(session.user.id)
+    }
+    if (!currentProfile?.username) { init(); return }
+    showMessagesPage(currentProfile, getNavCallbacks())
   },
 })
 

@@ -9,7 +9,7 @@
 - [x] erste klare Page-Module anlegen (Feed, Profile, Explore, Settings, Board, Auth)
 - [x] Single-SPA-Grundstruktur vorbereiten
 - [x] Legacy-HTMLs (`feed.html`, `explore.html`, `profile.html`) entfernt — nur noch `index.html`
-- [ ] offene Produktentscheidung festziehen: `/` = Landing, Feed oder Redirect (Phase 6)
+- [x] offene Produktentscheidung festziehen: `/` = **Home Feed** für eingeloggte User, Login-Gate für Gäste (Phase 6)
 
 ## Phase 2 — Service Layer / Datenzugriff
 
@@ -93,9 +93,13 @@
 
 ## Phase 6 — Produktentscheidungen
 
-- [ ] Landing-Verhalten (`/`): Landing | Home Feed | Profil-Redirect
-- [ ] Social-Graph-Modell: echte Freundschaften | Follows | Follows + Requests
-- [ ] Messages-Scope: jetzt | Placeholder-Route | später
+- [x] Landing-Verhalten (`/`): **Home Feed** (eingeloggt) / Login-Gate (Gast) — bereits Standardverhalten in `init()`
+- [x] Social-Graph-Modell: **Follows + Follow-Requests für private Profile** — `friendships.status ∈ {accepted, pending}`, public-Profile auto-accept, `profile_privacy='private'` braucht Annahme durch den Owner
+- [x] Messages-Scope: **Placeholder-Route** — `/messages` reserviert, echte DMs später
+- [x] `/messages` Placeholder-Route angelegt (`pages/messages.page.js`, Route in `router.js`)
+- [ ] Follow-Request-UI im Profil-Header (Pending-State, "Anfrage zurückziehen", Owner-Side "Akzeptieren / Ablehnen") — Folge-Phase, **erst nach RLS-Apply**
+- [ ] Follow-Request-Auto-Accept-Logik server-/RLS-seitig festziehen: Insert in `friendships` → wenn Ziel-Profil `public/followers` → `status='accepted'`, sonst `status='pending'` (Trigger oder Edge Function)
+- [ ] Messages in Sidebar/Bottombar einblenden, sobald echtes Surface existiert (heute bewusst nicht in Nav)
 
 ## Phase 7 — Trusted Actions / Edge Functions
 

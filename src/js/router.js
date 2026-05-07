@@ -34,6 +34,8 @@ export function handleRoute() {
     handlers.settings?.()
   } else if (path === '/explore') {
     handlers.explore?.()
+  } else if (path === '/messages') {
+    handlers.messages?.()
   } else if (boardMatch) {
     handlers.board?.(boardMatch[1], boardMatch[2])
   } else if (profileMatch) {

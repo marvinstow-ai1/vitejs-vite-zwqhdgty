@@ -116,6 +116,15 @@ create index if not exists story_views_story_idx
 
 
 -- friendships ----------------------------------------------------------------
+-- Phase-6 decision: social graph is "follows + follow requests for private
+-- profiles". `status='accepted'` = active follow, `status='pending'` =
+-- outstanding request that must be accepted by the owner of a private profile.
+-- The default below stays 'accepted' so public/followers profiles auto-follow;
+-- the *server-side rule* that forces `status='pending'` for inserts targeting
+-- private profiles is INTENTIONALLY NOT IN THIS MIGRATION — it belongs in a
+-- BEFORE INSERT trigger or Edge Function (see docs/PHASE3_RLS_AUDIT.md §E.2
+-- and the Phase-6 follow-ups in docs/ROADMAP.md). Until that rule lands,
+-- "private profile + follow request" is enforced only by frontend UX.
 alter table public.friendships
   alter column status set default 'accepted';
 

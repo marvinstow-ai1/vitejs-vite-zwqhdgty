@@ -296,20 +296,46 @@ be reviewed and applied through the Supabase dashboard, or (b) Edge Functions:
 
 ---
 
-## E. Open product questions blocking final RLS
+## E. Phase-6 product decisions (resolved) and their RLS impact
 
-These need an answer before the migration is finalized:
+The Phase-6 product questions have been answered. Summary of how they affect
+the migration draft:
 
-1. **`/` landing behavior** — does not affect RLS, but affects whether
-   anonymous users can read public posts on the landing route. If yes, the
-   `posts` SELECT policy must allow `auth.uid() IS NULL` for `visibility = 'public'`.
-2. **Social graph** — current model is one-directional follows with auto-accept.
-   If follow-requests for private profiles are added, the visibility predicate
-   for follower-only content changes from
-   `EXISTS (friendships WHERE status='accepted')` to the same — no change. But
-   `loadFeedPosts` would need to filter pending requests out of the
-   "followed" list. The proposed CHECK already allows `'pending'`.
-3. **Messages** — out of scope for Phase 3.
+1. **`/` landing behavior — Home Feed for logged-in users, login gate for guests.**
+   The app today does not render public content for anonymous visitors
+   (`init()` calls `showLogin` when there is no session). The migration's
+   SELECT policies therefore stay tied to `auth.uid()` — there is **no
+   anonymous read path**. If an anonymous public-post landing is added later,
+   the `posts` SELECT policy must be widened with an `OR (auth.uid() IS NULL
+   AND visibility = 'public' AND NOT EXISTS …blocks…)` branch. **No change
+   needed in the current draft.**
+
+2. **Social graph — Follows + Follow-Requests for private profiles.**
+   The schema already supports both states via `friendships.status` and the
+   draft's `CHECK (status IN ('accepted','pending'))`. Visibility predicates
+   (`is_following`, follower-only posts/boards/stories) already filter on
+   `status = 'accepted'`, so a pending request grants no read access — exactly
+   what we want. **Open follow-up the migration draft does NOT yet enforce:**
+   - on INSERT into `friendships`, the row's `status` must depend on the
+     target profile's `profile_privacy`:
+     - target is `public` or `followers` → `status = 'accepted'` (auto-follow)
+     - target is `private` → `status = 'pending'` (request, owner must accept)
+   - the cleanest place for this is a `BEFORE INSERT` trigger on
+     `friendships` (or a `SECURITY DEFINER` Edge Function). This is **not**
+     in `0001_phase3_rls.sql` yet — see Phase 6/7 follow-ups in the roadmap.
+   - the existing `friendships_insert` policy currently allows any value of
+     `status`. Once the trigger is in place, we should additionally lock the
+     RLS WITH CHECK to forbid the actor from inserting `status='accepted'`
+     toward a private profile, e.g.
+     `(NOT (status = 'accepted' AND target_profile_privacy = 'private'))`.
+   - `loadFeedPosts` already calls `getFollowedIds()` filtering on
+     `status = 'accepted'` (verify in service); pending requests must NOT
+     leak follower-only content into the feed.
+
+3. **Messages — placeholder route only.** No new tables, no new policies in
+   this migration. `/messages` is wired to a static placeholder page; the
+   eventual `conversations` / `messages` schema and its RLS will be a separate
+   migration when DMs are actually built.
 
 ---
 
