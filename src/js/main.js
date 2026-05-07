@@ -1228,6 +1228,7 @@ async function showProfilePage(username) {
       if (error) { console.error('follow failed', error); btn.disabled = false; return }
       followId = data?.id || null; following = true
       btn.textContent = 'Entfolgen'; btn.style.background = 'transparent'; btn.style.color = '#fff'
+      createNotification(profile.id, currentUserId, 'follow').catch(e => console.error('follow notif failed', e))
     }
     btn.disabled = false
   })
