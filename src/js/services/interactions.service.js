@@ -1,22 +1,26 @@
 import { supabase } from '../supabase.js'
+import { notifyAction } from './notify.action.js'
 
 // ─── Notifications ────────────────────────────────────────────────────────────
 
 /**
- * Erstellt eine Benachrichtigung (ignoriert self-notifications).
+ * @deprecated Call `notifyAction` from `services/notify.action.js` directly.
+ * Re-exported here only for back-compat with feed/profile pages.
  */
-export async function createNotification(toUserId, fromUserId, type, postId = null) {
-  if (toUserId === fromUserId) return
-  await supabase.from('notifications').insert({
-    user_id: toUserId,
-    from_user_id: fromUserId,
-    type,
-    post_id: postId,
-    read: false,
-  })
-}
+export const createNotification = notifyAction
 
 // ─── Likes ────────────────────────────────────────────────────────────────────
+
+/**
+ * Gibt die aktuelle Like-Anzahl eines Posts zurück.
+ */
+export async function getLikeCount(postId) {
+  const { count } = await supabase
+    .from('likes')
+    .select('*', { count: 'exact', head: true })
+    .eq('post_id', postId)
+  return count ?? 0
+}
 
 /**
  * Toggled einen Like auf einem Post.
@@ -35,7 +39,7 @@ export async function toggleLike(postId, currentUserId, currentlyLiked, ownerId)
       .from('likes')
       .insert({ post_id: postId, user_id: currentUserId })
     if (!error && ownerId) {
-      await createNotification(ownerId, currentUserId, 'like', postId)
+      await notifyAction(ownerId, currentUserId, 'like', postId)
     }
     return { newLiked: true, error }
   }
@@ -87,7 +91,7 @@ export async function addRepost(postId, currentUserId, ownerId, { boardId, showO
       .insert({ board_id: boardId, post_id: postId, user_id: currentUserId })
     if (bpErr && bpErr.code !== '23505') console.error('board_posts insert failed', bpErr)
   }
-  if (ownerId) await createNotification(ownerId, currentUserId, 'repost', postId)
+  if (ownerId) await notifyAction(ownerId, currentUserId, 'repost', postId)
   return { error: null }
 }
 

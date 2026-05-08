@@ -34,8 +34,15 @@ export async function isFollowing(currentUserId, targetUserId) {
 }
 
 /**
- * Filtert Posts nach Sichtbarkeit für den aktuellen Viewer.
- * Gibt ein Set sichtbarer Post-IDs zurück.
+ * UX-only filter: dropped posts the viewer should not render.
+ *
+ * ⚠️ NOT A SECURITY BOUNDARY. This runs in the browser and only filters rows
+ * that the database has already returned. The real visibility check must be
+ * an RLS policy on `posts` (see docs/PHASE3_RLS_AUDIT.md §A1 and the
+ * `posts_select` policy in supabase/migrations/0001_phase3_rls.sql).
+ *
+ * Once that RLS lands, this helper is redundant and can be removed.
+ *
  * @param {Array} posts
  * @param {string|null} currentUserId
  * @returns {Promise<Set<string>>}

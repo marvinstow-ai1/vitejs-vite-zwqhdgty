@@ -2,8 +2,9 @@ import { supabase } from '../supabase.js'
 import { shellHtml, wireShellNav, applyNavPref, getNavPref, setNavPref, refreshUnreadBadge } from '../shell.js'
 import { iconSvg, escapeHtml } from '../utils.js'
 import { getUnreadCount } from '../services/notifications.service.js'
-import { updateProfile } from '../services/profiles.service.js'
+import { updateProfile, getMyBlocks } from '../services/profiles.service.js'
 import { signOut } from '../services/auth.service.js'
+import { unblockUser } from '../services/interactions.service.js'
 
 /**
  * Zeigt die Einstellungs-Seite.
@@ -165,22 +166,12 @@ export async function showSettingsPage(profile, session, ctx) {
  */
 export async function openBlocksModal(userId) {
   const host = document.querySelector('#blocks-host')
-  const { data: blocks } = await supabase
-    .from('blocks')
-    .select('blocked_id, created_at')
-    .eq('blocker_id', userId)
-    .order('created_at', { ascending: false })
+  const blocks = await getMyBlocks(userId)
 
   let rows = '<p style="color:var(--text-mute);font-size:13px;padding:16px;">Niemand blockiert.</p>'
-  if (blocks?.length) {
-    const ids = blocks.map(b => b.blocked_id)
-    const { data: profs } = await supabase
-      .from('profiles')
-      .select('id, username, display_name')
-      .in('id', ids)
-    const m = Object.fromEntries((profs || []).map(p => [p.id, p]))
+  if (blocks.length) {
     rows = blocks.map(b => {
-      const p = m[b.blocked_id]; if (!p) return ''
+      const p = b.profile
       return `
         <div class="settings-row" style="cursor:default;">
           <span class="icon">${iconSvg('user', 18)}</span>
@@ -214,11 +205,7 @@ export async function openBlocksModal(userId) {
     btn.onclick = async () => {
       btn.disabled = true
       const id = btn.dataset.unblock
-      const { error } = await supabase
-        .from('blocks')
-        .delete()
-        .eq('blocker_id', userId)
-        .eq('blocked_id', id)
+      const { error } = await unblockUser(userId, id)
       if (error) { console.error(error); btn.disabled = false; return }
       close()
       openBlocksModal(userId)

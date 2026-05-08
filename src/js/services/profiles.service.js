@@ -59,6 +59,58 @@ export async function searchProfiles(query, limit = 6) {
 }
 
 /**
+ * Liefert Beziehung zwischen Viewer und Target: following + Block-Status (beide Richtungen).
+ * Konsolidiert die drei separaten Queries auf der Profilseite.
+ *
+ * NOTE: Die Block-Sichtbarkeit ist hier ein UX-Hinweis — die echte Durchsetzung
+ * gehört in RLS. Siehe docs/PHASE3_RLS_AUDIT.md §A11.
+ *
+ * @param {string} viewerId
+ * @param {string} targetId
+ * @returns {Promise<{ following: boolean, iBlocked: boolean, iAmBlocked: boolean }>}
+ */
+export async function getRelationshipStatus(viewerId, targetId) {
+  if (!viewerId || viewerId === targetId) {
+    return { following: false, iBlocked: false, iAmBlocked: false }
+  }
+  const [fwRes, bOutRes, bInRes] = await Promise.all([
+    supabase.from('friendships').select('id')
+      .eq('user_id', viewerId).eq('friend_id', targetId).eq('status', 'accepted').maybeSingle(),
+    supabase.from('blocks').select('id')
+      .eq('blocker_id', viewerId).eq('blocked_id', targetId).maybeSingle(),
+    supabase.from('blocks').select('id')
+      .eq('blocker_id', targetId).eq('blocked_id', viewerId).maybeSingle(),
+  ])
+  return {
+    following: !!fwRes.data,
+    iBlocked: !!bOutRes.data,
+    iAmBlocked: !!bInRes.data,
+  }
+}
+
+/**
+ * Liest die Liste der vom Viewer blockierten User inkl. Username/Display-Name.
+ * @param {string} viewerId
+ */
+export async function getMyBlocks(viewerId) {
+  const { data: blocks } = await supabase
+    .from('blocks')
+    .select('blocked_id, created_at')
+    .eq('blocker_id', viewerId)
+    .order('created_at', { ascending: false })
+  if (!blocks?.length) return []
+  const ids = blocks.map(b => b.blocked_id)
+  const { data: profs } = await supabase
+    .from('profiles')
+    .select('id, username, display_name')
+    .in('id', ids)
+  const m = Object.fromEntries((profs || []).map(p => [p.id, p]))
+  return blocks
+    .map(b => ({ ...b, profile: m[b.blocked_id] || null }))
+    .filter(b => b.profile)
+}
+
+/**
  * Gibt Follower- und Following-Anzahl zurück.
  * @param {string} profileId
  */
