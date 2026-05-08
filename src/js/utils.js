@@ -106,6 +106,29 @@ export function buildPatternStyle(pattern) {
   return p[pattern] || p.dots
 }
 
+// ─── Toast notification ───────────────────────────────────────────────────────
+
+/**
+ * Shows a brief toast message at the bottom of the screen.
+ * @param {string} message
+ * @param {'error'|'success'|'info'} type
+ */
+export function showToast(message, type = 'error') {
+  const existing = document.querySelector('#app-toast')
+  if (existing) existing.remove()
+  const el = document.createElement('div')
+  el.id = 'app-toast'
+  const bg = type === 'success' ? 'rgba(6,214,160,0.95)' : type === 'info' ? 'rgba(77,159,255,0.95)' : 'rgba(255,77,109,0.95)'
+  el.style.cssText = `position:fixed;bottom:80px;left:50%;transform:translateX(-50%);z-index:9999;background:${bg};color:#fff;font-size:13px;font-weight:500;padding:10px 20px;border-radius:24px;white-space:nowrap;pointer-events:none;max-width:calc(100vw - 40px);text-align:center;box-shadow:0 4px 16px rgba(0,0,0,0.5);`
+  el.textContent = message
+  document.body.appendChild(el)
+  setTimeout(() => {
+    el.style.transition = 'opacity 0.3s'
+    el.style.opacity = '0'
+    setTimeout(() => el.remove(), 300)
+  }, 2700)
+}
+
 export function buildMusicEmbed(url) {
   if (!url) return ''
   if (url.includes('spotify.com')) {

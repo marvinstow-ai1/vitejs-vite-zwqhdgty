@@ -1,5 +1,6 @@
 import { signIn, signUp } from '../services/auth.service.js'
 import { setUsername } from '../services/profiles.service.js'
+import { trackEvent } from '../analytics.js'
 
 /**
  * Zeigt die Login/Registrierungs-Seite.
@@ -69,6 +70,7 @@ export function showUsernameSetup(userId, onSuccess) {
       msg.textContent = error.code === '23505' ? 'Username bereits vergeben' : error.message
       return
     }
+    trackEvent('Signup Completed')
     onSuccess()
   })
 }

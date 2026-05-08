@@ -111,6 +111,46 @@ export async function getMyBlocks(viewerId) {
 }
 
 /**
+ * Gibt die Profil-Objekte zurück, die einem User folgen.
+ * @param {string} userId
+ * @returns {Promise<Array<{id, username, display_name}>>}
+ */
+export async function getFollowers(userId) {
+  if (!userId) return []
+  const { data: fs } = await supabase
+    .from('friendships')
+    .select('user_id')
+    .eq('friend_id', userId)
+    .eq('status', 'accepted')
+  if (!fs?.length) return []
+  const { data } = await supabase
+    .from('profiles')
+    .select('id, username, display_name')
+    .in('id', fs.map(f => f.user_id))
+  return data || []
+}
+
+/**
+ * Gibt die Profil-Objekte zurück, denen ein User folgt.
+ * @param {string} userId
+ * @returns {Promise<Array<{id, username, display_name}>>}
+ */
+export async function getFollowing(userId) {
+  if (!userId) return []
+  const { data: fs } = await supabase
+    .from('friendships')
+    .select('friend_id')
+    .eq('user_id', userId)
+    .eq('status', 'accepted')
+  if (!fs?.length) return []
+  const { data } = await supabase
+    .from('profiles')
+    .select('id, username, display_name')
+    .in('id', fs.map(f => f.friend_id))
+  return data || []
+}
+
+/**
  * Gibt Follower- und Following-Anzahl zurück.
  * @param {string} profileId
  */

@@ -70,8 +70,23 @@
 - [x] echten Feed-Inhalt in `showFeed()`
 - [x] `loadFeedPosts()` an Feed-Rendering
 - [x] Feed-Interaktionen (Like, Repost, Comment, Profil-Navigation, Mood-Filter)
+- [x] Like/Repost RLS-Fehler → Toast statt silent fail
+- [x] Privatprofil-Zustand → "Profil ist privat" statt White Screen
+- [x] Story-Viewer: leere Liste abgefangen, null media_url guard, unavailable overlay
+- [x] Feed leerer Mood-Filter → atmosphärischer Empty State statt generischer Meldung
+- [x] Profil-Follow-Fehler → Toast statt console.error
+- [x] Eigenes privates Profil → Hinweis-Banner mit Link zu Einstellungen
+- [x] Follower-/Following-Liste als Modal (bottom sheet mobile, centered desktop)
+  - Clickable Counts in Info-Panel
+  - Avatar, Display Name, Username, Follow-Button pro Eintrag
+  - Privates Profil → "Nur Follower können die Liste sehen"
+- [x] Explore von Placeholder zu echter Discovery-Seite ausgebaut
+  - Öffentliche Posts, nur Bilder/Videos (keine Embeds)
+  - Mood-Filter-Bar
+  - Masonry Grid, Skeleton-Loader, Empty State
+  - Lightbox bei Tap/Klick
+  - Pagination (Mehr entdecken)
 - [ ] Feed-Verhalten für eingeloggte User final definieren
-- [ ] Explore von Placeholder zu echter Discovery-Seite ausbauen
 - [ ] Profilseite weiter entkoppeln (Header / Boards / Stories / Reposts / Social Actions)
 - [ ] Board-Seite weiter modularisieren
 - [ ] Story-Workflow weiter bereinigen
@@ -108,7 +123,22 @@
 ## Phase 8 — Cleanup / Tech Debt
 
 - [ ] `interactions.service.js#createNotification` Re-Export entfernen, sobald keine Aufrufer
-- [ ] `getVisiblePostIds()` entfernen, sobald RLS aktiv
+- [ ] `getVisiblePostIds()` entfernen, sobald RLS aktiv (⚠️ NOCH NICHT entfernt — warte auf 0002 apply)
 - [ ] leere / nicht genutzte Dateien prüfen
 - [ ] zirkuläre Import-Risiken vermeiden
 - [ ] Modal-Logik aus `feed.page.js` in gemeinsame Schicht
+
+## Phase 12 — Analytics / Datenschutz
+
+- [x] `src/js/analytics.js` angelegt — thin Plausible wrapper (`trackEvent()`)
+- [x] Plausible Script-Tag in `index.html` eingefügt (domain = `[YOUR-DOMAIN]`)
+- [x] Events verdrahtet:
+  - Signup Completed → auth.page.js (nach Username-Setup)
+  - Post Created → feed.page.js (Composer-Submit)
+  - Like Given → feed.page.js (_handleLike)
+  - Follow Action → profile.page.js (Follow-Button + Follow-List-Modal)
+  - Story Viewed → feed.page.js (openStoryViewer render)
+  - Explore Opened → explore.page.js (showExplorePage)
+- [ ] `[YOUR-DOMAIN]` in index.html ersetzen (menschliche Aktion)
+- [ ] /datenschutz um Plausible-Paragraph ergänzen (menschliche Aktion — legal.page.js fehlt noch)
+- [ ] Cookie-Banner prüfen (Plausible braucht keinen — DSGVO-konform ohne Cookies)

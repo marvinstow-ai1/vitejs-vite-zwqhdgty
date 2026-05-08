@@ -1,6 +1,7 @@
 import { supabase } from '../supabase.js'
 import { shellHtml, wireShellNav, applyNavPref, refreshUnreadBadge } from '../shell.js'
-import { iconSvg, escapeHtml, detectMediaType, renderMediaEl, timeAgo } from '../utils.js'
+import { iconSvg, escapeHtml, detectMediaType, renderMediaEl, timeAgo, showToast } from '../utils.js'
+import { trackEvent } from '../analytics.js'
 import { loadFeedPosts, getVisiblePostIds, loadPostInteractions, loadMoodTags, loadUsernameMap, insertPost } from '../services/posts.service.js'
 import { toggleLike, addRepost, removeRepost, getOrCreateRepostsBoardId, loadComments, insertComment, getLikeCount } from '../services/interactions.service.js'
 import { getBoardsByUser } from '../services/boards.service.js'
@@ -135,7 +136,7 @@ export async function loadFeed(profile, navigate) {
   if (!posts.length) {
     grid.innerHTML = ''
     if (activeMood) {
-      _showState(`Keine Posts mit #${activeMood}.`)
+      _showMoodEmptyState(activeMood, profile, navigate)
     } else {
       _showWelcomeState(profile, navigate)
     }
@@ -173,6 +174,19 @@ function _showWelcomeState(profile, navigate) {
     </div>`)
   document.querySelector('#cta-profile')?.addEventListener('click', () => navigate('/u/' + profile.username))
   document.querySelector('#cta-explore')?.addEventListener('click', () => navigate('/explore'))
+}
+
+function _showMoodEmptyState(mood, profile, navigate) {
+  _showState(`
+    <div style="font-size:28px;margin-bottom:12px;opacity:.7;">✦</div>
+    <p style="color:#ccc;font-size:14px;margin:0 0 8px;">Noch nichts unter <strong style="color:#fff;">#${escapeHtml(mood)}</strong></p>
+    <p style="color:#555;font-size:12px;margin:0 0 20px;line-height:1.5;">Wer den Mood setzt, schreibt die Geschichte.</p>
+    <button id="clear-mood-btn" style="padding:7px 18px;background:transparent;border:1px solid #2a2a2a;border-radius:20px;color:#555;font-size:12px;cursor:pointer;">Filter aufheben</button>
+  `)
+  document.querySelector('#clear-mood-btn')?.addEventListener('click', () => {
+    activeMood = null
+    loadFeed(profile, navigate)
+  })
 }
 
 function _renderFilterBar(profile, navigate) {
@@ -279,11 +293,14 @@ async function _handleLike(btn, currentUserId) {
 
   const { error } = await toggleLike(postId, currentUserId, liked, ownerId)
   if (error) {
+    showToast('Like fehlgeschlagen – bitte erneut versuchen.')
     // Rollback
     btn.dataset.liked = String(liked)
     btn.style.color = liked ? '#ff4d6d' : '#555'
     if (iconEl) iconEl.textContent = liked ? '♥' : '♡'
     if (countEl) countEl.textContent = current
+  } else if (!liked) {
+    trackEvent('Like Given')
   }
 }
 
@@ -357,6 +374,21 @@ export async function loadStoryBar(currentUserId) {
       openStoryViewer(grouped[userId], currentUserId, viewedSet, () => loadStoryBar(currentUserId))
     })
   })
+}
+
+function _showUnavailableStory(onClose) {
+  const el = document.createElement('div')
+  el.style.cssText = 'position:fixed;inset:0;z-index:400;background:#000;display:flex;align-items:center;justify-content:center;'
+  el.innerHTML = `
+    <div style="text-align:center;padding:32px;">
+      <div style="font-size:40px;margin-bottom:16px;">🔒</div>
+      <p style="color:#666;font-size:14px;margin:0 0 24px;line-height:1.5;">Story nicht verfügbar.</p>
+      <button id="unavail-close" style="padding:9px 22px;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:8px;color:#888;font-size:13px;cursor:pointer;">Schließen</button>
+    </div>`
+  document.body.appendChild(el)
+  const close = () => { el.remove(); onClose?.() }
+  el.querySelector('#unavail-close').addEventListener('click', close)
+  el.addEventListener('click', e => { if (e.target === el) close() })
 }
 
 // ─── Story Upload Modal ───────────────────────────────────────────────────────
@@ -435,6 +467,11 @@ export function openStoryViewer(stories, currentUserId, viewedSet, onClose) {
   const existing = document.querySelector('#story-viewer')
   if (existing) existing.remove()
 
+  if (!stories?.length) {
+    _showUnavailableStory(onClose)
+    return
+  }
+
   let current = 0
   let progressTimer = null
   const DURATION = 5000
@@ -445,8 +482,10 @@ export function openStoryViewer(stories, currentUserId, viewedSet, onClose) {
 
   const render = () => {
     const story = stories[current]
+    if (!story) { close(); return }
     const mt = story.media_type || detectMediaType(story.media_url)
     const isOwn = story.user_id === currentUserId
+    const hasMedia = !!story.media_url
 
     viewer.innerHTML = `
       <div style="position:absolute;top:0;left:0;right:0;z-index:10;display:flex;gap:3px;padding:10px 12px 0;">
@@ -471,7 +510,12 @@ export function openStoryViewer(stories, currentUserId, viewedSet, onClose) {
         </div>
       </div>
       <div style="flex:1;display:flex;align-items:center;justify-content:center;overflow:hidden;">
-        ${mt === 'video' || mt === 'gif'
+        ${!hasMedia
+          ? `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;color:#444;">
+               <div style="font-size:36px;">🔒</div>
+               <p style="font-size:14px;margin:0;">Story nicht verfügbar</p>
+             </div>`
+          : mt === 'video' || mt === 'gif'
           ? `<video src="${story.media_url}" style="width:100%;height:100%;object-fit:contain;" autoplay loop muted playsinline></video>`
           : `<img src="${story.media_url}" style="width:100%;height:100%;object-fit:contain;" />`}
       </div>
@@ -493,6 +537,7 @@ export function openStoryViewer(stories, currentUserId, viewedSet, onClose) {
     if (!viewedSet.has(story.id)) {
       viewedSet.add(story.id)
       markStoryViewed(story.id, currentUserId)
+      trackEvent('Story Viewed')
     }
 
     viewer.querySelector('#story-close').addEventListener('click', close)
@@ -514,7 +559,7 @@ export function openStoryViewer(stories, currentUserId, viewedSet, onClose) {
         render()
       })
       viewer.querySelector('#viewer-count')?.addEventListener('click', async () => {
-        const views = await getStoryViewers(story.id)
+        const views = (await getStoryViewers(story.id)) || []
         const list = views.map(v => '@' + (v.profiles?.username || '?')).join('\n') || 'Noch keine Viewer'
         alert(`👁 ${views.length} Viewer:\n\n${list}`)
       })
@@ -682,6 +727,7 @@ function _wireComposer(profile, navigate) {
       user_id: profile.id, media_url: mediaUrl, media_type: mediaType, mood, visibility: postVisibility,
     })
     if (error) { msg.textContent = error.message; return }
+    trackEvent('Post Created')
     msg.textContent = '✓ Gepostet!'
     setTimeout(() => {
       _closeComposerModal()

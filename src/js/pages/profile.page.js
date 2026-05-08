@@ -1,7 +1,7 @@
 import { supabase } from '../supabase.js'
 import { getSession } from '../services/auth.service.js'
-import { getProfileByUsername, updateProfile, getFollowCounts, getRelationshipStatus } from '../services/profiles.service.js'
-import { getVisiblePostIds } from '../services/posts.service.js'
+import { getProfileByUsername, updateProfile, getFollowCounts, getRelationshipStatus, getFollowers, getFollowing } from '../services/profiles.service.js'
+import { getVisiblePostIds, getFollowedIds } from '../services/posts.service.js'
 import { followUser, unfollowUser, blockUser, unblockUser } from '../services/interactions.service.js'
 import { notifyAction } from '../services/notify.action.js'
 import { uploadHeaderImage } from '../services/media.service.js'
@@ -9,7 +9,8 @@ import { getBoardsByUser, getProfileReposts, getUserRepostIds, createBoard, upda
 import { loadProfileStories, getViewedStoryIds } from '../services/stories.service.js'
 import { renderBoardPost, wireBoardRepostButtons, loadBoardContent } from './board.page.js'
 import { openStoryViewer, openRepostModal } from './feed.page.js'
-import { escapeHtml, shuffleArray, buildHeaderStyle, buildPatternStyle, buildMusicEmbed, iconSvg } from '../utils.js'
+import { escapeHtml, shuffleArray, buildHeaderStyle, buildPatternStyle, buildMusicEmbed, iconSvg, showToast } from '../utils.js'
+import { trackEvent } from '../analytics.js'
 
 /**
  * Zeigt eine Profilseite.
@@ -144,11 +145,19 @@ export async function showProfilePage(username, ctx) {
       <div id="info-panel" style="display:none;background:#111;border-bottom:1px solid #222;padding:16px 20px;">
         <div style="display:flex;gap:24px;font-size:13px;color:#666;">
           <span><strong style="color:#fff;">${boardPosts.length}</strong> Posts</span>
-          <span><strong style="color:#fff;">${followerCount}</strong> Follower</span>
-          <span><strong style="color:#fff;">${followingCount}</strong> Following</span>
+          <span id="btn-followers" style="cursor:pointer;" title="Follower anzeigen"><strong style="color:#fff;">${followerCount}</strong> Follower</span>
+          <span id="btn-following" style="cursor:pointer;" title="Following anzeigen"><strong style="color:#fff;">${followingCount}</strong> Following</span>
         </div>
         ${profile.profile_link ? `<a href="${escapeHtml(profile.profile_link)}" target="_blank" rel="noopener" style="display:inline-block;margin-top:8px;font-size:12px;color:#4d9fff;text-decoration:none;">🔗 ${escapeHtml(profile.profile_link)}</a>` : ''}
       </div>
+
+      ${isOwner && profilePrivacy !== 'public' ? `
+      <div style="background:#110808;border-bottom:1px solid #2a1010;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;">
+        <p style="color:#cc8888;font-size:12px;margin:0;line-height:1.4;">
+          ${profilePrivacy === 'private' ? '🔒 Dein Profil ist privat — nur du siehst dein Board.' : '👥 Dein Profil ist nur für Follower sichtbar.'}
+        </p>
+        <button id="btn-privacy-settings" style="padding:5px 12px;background:transparent;border:1px solid #3a1a1a;border-radius:6px;color:#cc7777;font-size:11px;cursor:pointer;white-space:nowrap;flex-shrink:0;">Einstellungen</button>
+      </div>` : ''}
 
       <!-- Musik Panel -->
       <div id="music-panel" style="display:none;"></div>
@@ -292,6 +301,16 @@ export async function showProfilePage(username, ctx) {
     const p = document.querySelector('#info-panel')
     p.style.display = p.style.display === 'none' ? 'block' : 'none'
   })
+
+  document.querySelector('#btn-privacy-settings')?.addEventListener('click', () => navigate('/settings'))
+
+  const canSeeFollowList = isOwner || profilePrivacy === 'public' || following
+  document.querySelector('#btn-followers')?.addEventListener('click', () => {
+    _openFollowListModal('followers', profile.id, currentUserId, isOwner || profilePrivacy === 'public' || following, navigate)
+  })
+  document.querySelector('#btn-following')?.addEventListener('click', () => {
+    _openFollowListModal('following', profile.id, currentUserId, isOwner || profilePrivacy === 'public' || following, navigate)
+  })
   document.querySelector('#btn-music')?.addEventListener('click', () => {
     const p = document.querySelector('#music-panel')
     if (p.style.display === 'none') { p.style.display = 'block'; p.innerHTML = buildMusicEmbed(profile.playlist_url) }
@@ -305,15 +324,22 @@ export async function showProfilePage(username, ctx) {
     btn.disabled = true
     if (following) {
       const { error } = await unfollowUser(currentUserId, profile.id)
-      if (error) { console.error('unfollow failed', error); btn.disabled = false; return }
+      if (error) {
+        showToast('Entfolgen fehlgeschlagen – bitte erneut versuchen.')
+        btn.disabled = false; return
+      }
       following = false
       btn.textContent = 'Folgen'; btn.style.background = 'rgba(255,255,255,0.9)'; btn.style.color = '#000'
     } else {
-      const { data, error } = await followUser(currentUserId, profile.id)
-      if (error) { console.error('follow failed', error); btn.disabled = false; return }
+      const { error } = await followUser(currentUserId, profile.id)
+      if (error) {
+        showToast('Folgen fehlgeschlagen – bitte erneut versuchen.')
+        btn.disabled = false; return
+      }
       following = true
       btn.textContent = 'Entfolgen'; btn.style.background = 'transparent'; btn.style.color = '#fff'
-      notifyAction(profile.id, currentUserId, 'follow').catch(e => console.error('follow notif failed', e))
+      notifyAction(profile.id, currentUserId, 'follow').catch(() => {})
+      trackEvent('Follow Action')
     }
     btn.disabled = false
   })
@@ -546,6 +572,112 @@ function _openBoardModal(board, currentUserId, username, navigate) {
     if (error) { msg.textContent = '❌ ' + error.message; return }
     msg.textContent = '✅ Gespeichert!'
     setTimeout(() => { modal.style.display = 'none'; navigate('/u/' + username) }, 600)
+  })
+}
+
+// ─── Follower / Following Modal ───────────────────────────────────────────────
+
+async function _openFollowListModal(type, profileId, currentUserId, canSeeList, navigate) {
+  const existing = document.querySelector('#follow-list-modal')
+  if (existing) existing.remove()
+
+  const isMobile = window.innerWidth < 640
+  const title = type === 'followers' ? 'Follower' : 'Following'
+
+  const modal = document.createElement('div')
+  modal.id = 'follow-list-modal'
+  modal.style.cssText = `position:fixed;inset:0;z-index:300;background:rgba(0,0,0,0.8);display:flex;align-items:${isMobile ? 'flex-end' : 'center'};justify-content:center;`
+  modal.innerHTML = `
+    <div style="background:#111;border:1px solid #222;border-radius:${isMobile ? '16px 16px 0 0' : '16px'};width:100%;max-width:${isMobile ? '100%' : '440px'};max-height:${isMobile ? '70vh' : '80vh'};display:flex;flex-direction:column;${isMobile ? '' : 'margin:16px;'}overflow:hidden;">
+      <div style="padding:14px 20px 12px;border-bottom:1px solid #1a1a1a;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">
+        <span style="font-size:14px;font-weight:500;color:#fff;">${title}</span>
+        <button id="follow-list-close" style="background:none;border:none;color:#555;font-size:24px;cursor:pointer;line-height:1;padding:0 4px;">×</button>
+      </div>
+      <div id="follow-list-body" style="flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;">
+        <div style="padding:24px;text-align:center;color:#444;font-size:13px;">Lädt...</div>
+      </div>
+    </div>`
+
+  document.body.appendChild(modal)
+
+  const close = () => modal.remove()
+  modal.querySelector('#follow-list-close').addEventListener('click', close)
+  modal.addEventListener('click', e => { if (e.target === modal) close() })
+
+  if (!canSeeList) {
+    modal.querySelector('#follow-list-body').innerHTML = `
+      <div style="padding:48px 24px;text-align:center;">
+        <div style="font-size:32px;margin-bottom:14px;">🔒</div>
+        <p style="color:#555;font-size:13px;line-height:1.5;">Nur Follower können die Liste sehen.</p>
+      </div>`
+    return
+  }
+
+  const list = type === 'followers'
+    ? await getFollowers(profileId)
+    : await getFollowing(profileId)
+
+  if (!list.length) {
+    modal.querySelector('#follow-list-body').innerHTML = `
+      <div style="padding:48px 24px;text-align:center;">
+        <p style="color:#444;font-size:13px;">${type === 'followers' ? 'Noch keine Follower.' : 'Folgt noch niemandem.'}</p>
+      </div>`
+    return
+  }
+
+  const viewerFollowing = currentUserId ? await getFollowedIds(currentUserId) : new Set()
+
+  modal.querySelector('#follow-list-body').innerHTML = list.map(p => {
+    const isMe = p.id === currentUserId
+    const isAlreadyFollowing = viewerFollowing.has(p.id)
+    return `
+      <div style="display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid #0f0f0f;">
+        <div class="fl-nav" data-username="${escapeHtml(p.username)}" style="width:40px;height:40px;border-radius:50%;background:#1e1e1e;display:flex;align-items:center;justify-content:center;font-size:16px;color:#666;flex-shrink:0;cursor:pointer;">${(p.username || '?')[0].toUpperCase()}</div>
+        <div class="fl-nav" data-username="${escapeHtml(p.username)}" style="flex:1;min-width:0;cursor:pointer;">
+          <div style="font-size:13px;font-weight:500;color:#e0e0e0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(p.display_name || p.username)}</div>
+          <div style="font-size:12px;color:#555;">@${escapeHtml(p.username)}</div>
+        </div>
+        ${isMe
+          ? `<span style="font-size:11px;color:#444;flex-shrink:0;">du</span>`
+          : `<button class="fl-follow-btn" data-uid="${p.id}" data-following="${isAlreadyFollowing}" style="padding:6px 14px;border-radius:8px;border:1px solid ${isAlreadyFollowing ? '#2a2a2a' : 'rgba(255,255,255,0.5)'};background:${isAlreadyFollowing ? 'transparent' : 'rgba(255,255,255,0.9)'};color:${isAlreadyFollowing ? '#666' : '#000'};font-size:12px;font-weight:500;cursor:pointer;flex-shrink:0;min-width:76px;">${isAlreadyFollowing ? 'Entfolgen' : 'Folgen'}</button>`
+        }
+      </div>`
+  }).join('')
+
+  modal.querySelectorAll('.fl-nav').forEach(el => {
+    el.addEventListener('click', () => { close(); navigate('/u/' + el.dataset.username) })
+  })
+
+  modal.querySelectorAll('.fl-follow-btn').forEach(btn => {
+    btn.addEventListener('click', async e => {
+      e.stopPropagation()
+      if (!currentUserId) return
+      const targetId = btn.dataset.uid
+      const alreadyFollowing = btn.dataset.following === 'true'
+      btn.disabled = true
+      if (alreadyFollowing) {
+        const { error } = await unfollowUser(currentUserId, targetId)
+        if (!error) {
+          btn.dataset.following = 'false'
+          btn.textContent = 'Folgen'
+          btn.style.background = 'rgba(255,255,255,0.9)'
+          btn.style.color = '#000'
+          btn.style.borderColor = 'rgba(255,255,255,0.5)'
+        }
+      } else {
+        const { error } = await followUser(currentUserId, targetId)
+        if (!error) {
+          btn.dataset.following = 'true'
+          btn.textContent = 'Entfolgen'
+          btn.style.background = 'transparent'
+          btn.style.color = '#666'
+          btn.style.borderColor = '#2a2a2a'
+          notifyAction(targetId, currentUserId, 'follow').catch(() => {})
+          trackEvent('Follow Action')
+        }
+      }
+      btn.disabled = false
+    })
   })
 }
 

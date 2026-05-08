@@ -146,6 +146,42 @@ export async function loadMoodTags() {
 }
 
 /**
+ * Lädt öffentliche Posts für die Explore-Seite (kein Repost-Filter nötig — nur echte Posts).
+ * @param {number} page
+ * @param {string|null} moodFilter
+ * @param {number} limit
+ */
+export async function loadExplorePosts(page = 0, moodFilter = null, limit = 24) {
+  let query = supabase
+    .from('posts')
+    .select('id, user_id, media_url, media_type, mood, created_at')
+    .eq('visibility', 'public')
+    .order('created_at', { ascending: false })
+    .range(page * limit, (page + 1) * limit - 1)
+  if (moodFilter) query = query.eq('mood', moodFilter)
+  return query
+}
+
+/**
+ * Gibt die häufigsten Mood-Tags aus öffentlichen Posts zurück.
+ * @returns {Promise<string[]>}
+ */
+export async function loadExplorePostsMoods() {
+  const { data } = await supabase
+    .from('posts')
+    .select('mood')
+    .eq('visibility', 'public')
+    .not('mood', 'is', null)
+  if (!data?.length) return []
+  const counts = {}
+  data.forEach(p => { counts[p.mood] = (counts[p.mood] || 0) + 1 })
+  return Object.entries(counts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 15)
+    .map(([mood]) => mood)
+}
+
+/**
  * Lädt Usernames für eine Liste von User-IDs.
  * @param {string[]} userIds
  * @returns {Promise<Record<string, string>>}
