@@ -2,7 +2,7 @@ import { supabase } from '../supabase.js'
 import { shellHtml, wireShellNav, applyNavPref, refreshUnreadBadge } from '../shell.js'
 import { iconSvg, escapeHtml, detectMediaType, renderMediaEl, timeAgo } from '../utils.js'
 import { loadFeedPosts, getVisiblePostIds, loadPostInteractions, loadMoodTags, loadUsernameMap } from '../services/posts.service.js'
-import { toggleLike, addRepost, removeRepost, getOrCreateRepostsBoardId, loadComments, insertComment, createNotification } from '../services/interactions.service.js'
+import { toggleLike, addRepost, removeRepost, getOrCreateRepostsBoardId, loadComments, insertComment, createNotification, acceptFollowRequest, rejectFollowRequest } from '../services/interactions.service.js'
 import { loadNotifications, getUnreadCount, markAllRead, subscribeToNotifications } from '../services/notifications.service.js'
 import { loadStoriesForUser, markStoryViewed, getStoryViewers, deleteStory, uploadStoryFile, insertStory } from '../services/stories.service.js'
 import { searchProfiles } from '../services/profiles.service.js'
@@ -612,19 +612,71 @@ async function _renderNotifications(currentUserId) {
   if (!notifs.length) { list.innerHTML = `<p style="padding:16px;color:#444;font-size:13px;">Keine Benachrichtigungen.</p>`; return }
   list.innerHTML = notifs.map(n => {
     const actor = n.senderUsername ? `@${n.senderUsername}` : 'Jemand'
-    const icon = n.type === 'like' ? '♥' : n.type === 'comment' ? '💬' : n.type === 'repost' ? '🔁' : '👤'
+    const isFollowReq = n.type === 'follow_request'
+    const icon = n.type === 'like' ? '♥' : n.type === 'comment' ? '💬' : n.type === 'repost' ? '🔁' : isFollowReq ? '👤' : '👤'
     const iconColor = n.type === 'like' ? '#ff4d6d' : n.type === 'comment' ? '#4d9fff' : n.type === 'repost' ? '#06d6a0' : '#aaa'
-    const text = n.type === 'like' ? 'hat deinen Post geliked' : n.type === 'comment' ? 'hat kommentiert' : n.type === 'repost' ? 'hat deinen Post gerepostet' : 'folgt dir jetzt'
+    const text = n.type === 'like'
+      ? 'hat deinen Post geliked'
+      : n.type === 'comment'
+        ? 'hat kommentiert'
+        : n.type === 'repost'
+          ? 'hat deinen Post gerepostet'
+          : isFollowReq
+            ? 'möchte dir folgen'
+            : 'folgt dir jetzt'
     const unread = !n.read
-    return `<div style="padding:12px 16px;border-bottom:1px solid #1a1a1a;display:flex;align-items:flex-start;gap:10px;background:${unread ? '#141414' : 'transparent'};">
+    // Follow-Request: Accept/Reject Buttons, solange noch nicht bearbeitet
+    const actionRow = isFollowReq && n.from_user_id
+      ? `<div style="display:flex;gap:6px;margin-top:8px;">
+          <button class="notif-accept-req" data-notif-id="${n.id}" data-requester-id="${n.from_user_id}" style="padding:5px 14px;background:#fff;color:#000;border:none;border-radius:6px;font-size:12px;font-weight:500;cursor:pointer;">Annehmen</button>
+          <button class="notif-reject-req" data-notif-id="${n.id}" data-requester-id="${n.from_user_id}" style="padding:5px 14px;background:transparent;color:#666;border:1px solid #333;border-radius:6px;font-size:12px;cursor:pointer;">Ablehnen</button>
+        </div>`
+      : ''
+    return `<div data-notif-id="${n.id}" style="padding:12px 16px;border-bottom:1px solid #1a1a1a;display:flex;align-items:flex-start;gap:10px;background:${unread ? '#141414' : 'transparent'};">
       <span style="font-size:14px;color:${iconColor};flex-shrink:0;margin-top:1px;">${icon}</span>
       <div style="flex:1;min-width:0;">
         <span style="font-size:13px;color:${unread ? '#ddd' : '#666'};"><strong style="color:${unread ? '#fff' : '#888'}">${actor}</strong> ${text}</span>
         <div style="font-size:11px;color:#444;margin-top:2px;">${timeAgo(n.created_at)}</div>
+        ${actionRow}
       </div>
-      ${unread ? `<div style="width:6px;height:6px;border-radius:50%;background:#ff4d6d;flex-shrink:0;margin-top:5px;"></div>` : ''}
+      ${unread && !isFollowReq ? `<div style="width:6px;height:6px;border-radius:50%;background:#ff4d6d;flex-shrink:0;margin-top:5px;"></div>` : ''}
     </div>`
   }).join('')
+
+  // ── Accept / Reject Handler ──────────────────────────────────────────────────
+  list.querySelectorAll('.notif-accept-req').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const requesterId = btn.dataset.requesterId
+      const notifId = btn.dataset.notifId
+      btn.disabled = true; btn.textContent = '...'
+      const { error } = await acceptFollowRequest(requesterId, currentUserId)
+      if (error) { console.error('accept follow request failed', error); btn.disabled = false; btn.textContent = 'Annehmen'; return }
+      // Notification als gelesen markieren und Row ersetzen
+      await supabase.from('notifications').update({ read: true }).eq('id', notifId)
+      const row = list.querySelector(`[data-notif-id="${notifId}"]`)
+      if (row) {
+        row.querySelector('.notif-accept-req')?.closest('div[style*="display:flex"]')?.remove()
+        const textEl = row.querySelector('span[style*="font-size:13px"]')
+        if (textEl) textEl.innerHTML = textEl.innerHTML.replace('möchte dir folgen', 'folgt dir jetzt ✓')
+        row.style.background = 'transparent'
+      }
+      _refreshNotifBadge(currentUserId)
+    })
+  })
+
+  list.querySelectorAll('.notif-reject-req').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const requesterId = btn.dataset.requesterId
+      const notifId = btn.dataset.notifId
+      btn.disabled = true; btn.textContent = '...'
+      const { error } = await rejectFollowRequest(requesterId, currentUserId)
+      if (error) { console.error('reject follow request failed', error); btn.disabled = false; btn.textContent = 'Ablehnen'; return }
+      await supabase.from('notifications').update({ read: true }).eq('id', notifId)
+      const row = list.querySelector(`[data-notif-id="${notifId}"]`)
+      if (row) row.remove()
+      _refreshNotifBadge(currentUserId)
+    })
+  })
 }
 
 function _toggleNotifPanel(profile) {

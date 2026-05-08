@@ -2,7 +2,7 @@ import { supabase } from '../supabase.js'
 import { getSession } from '../services/auth.service.js'
 import { getProfileByUsername, updateProfile, getFollowCounts } from '../services/profiles.service.js'
 import { getVisiblePostIds } from '../services/posts.service.js'
-import { followUser, unfollowUser, blockUser, unblockUser, createNotification } from '../services/interactions.service.js'
+import { followUser, unfollowUser, sendFollowRequest, withdrawFollowRequest, blockUser, unblockUser, createNotification } from '../services/interactions.service.js'
 import { getBoardsByUser, getProfileReposts, getUserRepostIds, createBoard, updateBoard } from '../services/boards.service.js'
 import { loadProfileStories, getViewedStoryIds } from '../services/stories.service.js'
 import { renderBoardPost, wireBoardRepostButtons, loadBoardContent } from './board.page.js'
@@ -33,19 +33,23 @@ export async function showProfilePage(username, ctx) {
 
   const isOwner = currentUserId === profile.id
   const profilePrivacy = profile.profile_privacy || 'public'
-  let following = false
+  // followState: 'none' | 'pending' | 'accepted'
+  let followState = 'none'
   let iBlocked = false, iAmBlocked = false
 
   if (currentUserId && !isOwner) {
     const [fwRes, bOutRes, bInRes] = await Promise.all([
-      supabase.from('friendships').select('id').eq('user_id', currentUserId).eq('friend_id', profile.id).eq('status', 'accepted').maybeSingle(),
+      supabase.from('friendships').select('id, status').eq('user_id', currentUserId).eq('friend_id', profile.id).maybeSingle(),
       supabase.from('blocks').select('id').eq('blocker_id', currentUserId).eq('blocked_id', profile.id).maybeSingle(),
       supabase.from('blocks').select('id').eq('blocker_id', profile.id).eq('blocked_id', currentUserId).maybeSingle(),
     ])
-    following = !!fwRes.data
+    if (fwRes.data?.status === 'accepted') followState = 'accepted'
+    else if (fwRes.data?.status === 'pending') followState = 'pending'
     iBlocked = !!bOutRes.data
     iAmBlocked = !!bInRes.data
   }
+  // Abwärtskompatibilität: following = true wenn accepted
+  let following = followState === 'accepted'
 
   if (iAmBlocked) {
     app.innerHTML = `<div style="background:#0a0a0a;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:24px;">
@@ -56,7 +60,7 @@ export async function showProfilePage(username, ctx) {
     return
   }
 
-  const canSeeBoard = !iBlocked && (isOwner || profilePrivacy === 'public' || (profilePrivacy === 'followers' && following))
+  const canSeeBoard = !iBlocked && (isOwner || profilePrivacy === 'public' || (profilePrivacy === 'followers' && followState === 'accepted'))
 
   const { data: ownPosts } = await supabase
     .from('posts')
@@ -131,7 +135,7 @@ export async function showProfilePage(username, ctx) {
             ? `<button id="btn-edit" class="icon-btn icon-btn-sm" aria-label="Profil bearbeiten" style="background:rgba(255,255,255,.15);">${iconSvg('edit', 14)}</button>
                <button id="btn-settings-link" class="icon-btn icon-btn-sm" aria-label="Einstellungen" style="background:rgba(0,0,0,0.5);">${iconSvg('settings', 14)}</button>`
             : currentUserId ? `
-              ${!iBlocked ? `<button id="btn-follow" style="padding:6px 14px;background:${following ? 'transparent' : 'rgba(255,255,255,0.9)'};color:${following ? '#fff' : '#000'};border:1px solid rgba(255,255,255,0.4);border-radius:8px;cursor:pointer;font-size:12px;font-weight:500;">${following ? 'Entfolgen' : 'Folgen'}</button>` : ''}
+              ${!iBlocked ? `<button id="btn-follow" data-state="${followState}" style="padding:6px 14px;background:${followState === 'accepted' ? 'transparent' : followState === 'pending' ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.9)'};color:${followState === 'accepted' ? '#fff' : followState === 'pending' ? '#888' : '#000'};border:1px solid ${followState === 'pending' ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.4)'};border-radius:8px;cursor:pointer;font-size:12px;font-weight:500;">${followState === 'accepted' ? 'Folgst du' : followState === 'pending' ? 'Angefragt' : 'Folgen'}</button>` : ''}
               <button id="btn-block" class="icon-btn icon-btn-sm" aria-label="${iBlocked ? 'Entblocken' : 'Blockieren'}" style="background:rgba(0,0,0,0.5);${iBlocked ? 'color:var(--danger);' : ''}">${iconSvg('ban', 14)}</button>
             ` : ''
           }
@@ -158,7 +162,14 @@ export async function showProfilePage(username, ctx) {
       ${!canSeeBoard ? `
         <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:80px 20px;gap:16px;">
           <div style="font-size:48px;">🔒</div>
-          <p style="color:#555;font-size:14px;text-align:center;max-width:280px;">${profilePrivacy === 'private' ? 'Dieses Profil ist privat.' : 'Nur Follower können dieses Board sehen.'}</p>
+          <p style="color:#555;font-size:14px;text-align:center;max-width:280px;">${
+            followState === 'pending'
+              ? 'Deine Anfrage ist ausstehend. Sobald sie angenommen wird, siehst du dieses Profil.'
+              : profilePrivacy === 'private'
+                ? 'Dieses Profil ist privat.'
+                : 'Nur Follower können dieses Board sehen.'
+          }</p>
+          ${followState === 'pending' ? `<button id="btn-withdraw-lock" style="padding:8px 20px;background:transparent;color:#666;border:1px solid #333;border-radius:8px;cursor:pointer;font-size:13px;">Anfrage zurückziehen</button>` : ''}
         </div>
       ` : `
         <!-- Boards Tabs -->
@@ -301,23 +312,71 @@ export async function showProfilePage(username, ctx) {
   })
 
   // ── Follow ───────────────────────────────────────────────────────────────────
+  const _applyFollowBtn = (btn, state) => {
+    btn.dataset.state = state
+    if (state === 'accepted') {
+      btn.textContent = 'Folgst du'
+      btn.style.background = 'transparent'
+      btn.style.color = '#fff'
+      btn.style.border = '1px solid rgba(255,255,255,0.4)'
+    } else if (state === 'pending') {
+      btn.textContent = 'Angefragt'
+      btn.style.background = 'rgba(255,255,255,0.08)'
+      btn.style.color = '#888'
+      btn.style.border = '1px solid rgba(255,255,255,0.2)'
+    } else {
+      btn.textContent = 'Folgen'
+      btn.style.background = 'rgba(255,255,255,0.9)'
+      btn.style.color = '#000'
+      btn.style.border = '1px solid rgba(255,255,255,0.4)'
+    }
+  }
+
   document.querySelector('#btn-follow')?.addEventListener('click', async () => {
     const btn = document.querySelector('#btn-follow')
     if (!currentUserId) return
     btn.disabled = true
-    if (following) {
+    const state = btn.dataset.state || followState
+
+    if (state === 'accepted') {
+      // Entfolgen
       const { error } = await unfollowUser(currentUserId, profile.id)
       if (error) { console.error('unfollow failed', error); btn.disabled = false; return }
-      following = false
-      btn.textContent = 'Folgen'; btn.style.background = 'rgba(255,255,255,0.9)'; btn.style.color = '#000'
+      followState = 'none'; following = false
+      _applyFollowBtn(btn, 'none')
+    } else if (state === 'pending') {
+      // Anfrage zurückziehen
+      const { error } = await withdrawFollowRequest(currentUserId, profile.id)
+      if (error) { console.error('withdraw failed', error); btn.disabled = false; return }
+      followState = 'none'; following = false
+      _applyFollowBtn(btn, 'none')
     } else {
-      const { data, error } = await followUser(currentUserId, profile.id)
-      if (error) { console.error('follow failed', error); btn.disabled = false; return }
-      following = true
-      btn.textContent = 'Entfolgen'; btn.style.background = 'transparent'; btn.style.color = '#fff'
-      createNotification(profile.id, currentUserId, 'follow').catch(e => console.error('follow notif failed', e))
+      // Folgen — bei privatem Profil → pending, sonst direkt accepted
+      if (profilePrivacy === 'private' || profilePrivacy === 'followers') {
+        const { error } = await sendFollowRequest(currentUserId, profile.id)
+        if (error) { console.error('follow request failed', error); btn.disabled = false; return }
+        followState = 'pending'
+        _applyFollowBtn(btn, 'pending')
+      } else {
+        const { error } = await followUser(currentUserId, profile.id)
+        if (error) { console.error('follow failed', error); btn.disabled = false; return }
+        followState = 'accepted'; following = true
+        _applyFollowBtn(btn, 'accepted')
+        createNotification(profile.id, currentUserId, 'follow').catch(e => console.error('follow notif failed', e))
+      }
     }
     btn.disabled = false
+  })
+
+  // Anfrage zurückziehen vom Lock-Screen
+  document.querySelector('#btn-withdraw-lock')?.addEventListener('click', async () => {
+    const btn = document.querySelector('#btn-withdraw-lock')
+    btn.disabled = true; btn.textContent = '...'
+    const { error } = await withdrawFollowRequest(currentUserId, profile.id)
+    if (error) { console.error('withdraw failed', error); btn.disabled = false; btn.textContent = 'Anfrage zurückziehen'; return }
+    followState = 'none'; following = false
+    // Seite neu laden damit Lock-Screen aktualisiert wird
+    showProfilePage(profile.username, ctx)
   })
 
   // ── Block ────────────────────────────────────────────────────────────────────

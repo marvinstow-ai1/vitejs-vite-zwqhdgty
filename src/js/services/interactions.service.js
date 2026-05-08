@@ -144,6 +144,10 @@ export async function insertComment(postId, userId, content) {
 
 // ─── Follow / Block ───────────────────────────────────────────────────────────
 
+/**
+ * Folgt einem User direkt (öffentliches Profil → status='accepted').
+ * Für private Profile: sendFollowRequest() verwenden.
+ */
 export async function followUser(currentUserId, targetUserId) {
   return supabase
     .from('friendships')
@@ -153,6 +157,66 @@ export async function followUser(currentUserId, targetUserId) {
     )
     .select()
     .single()
+}
+
+/**
+ * Sendet eine Follow-Anfrage (status='pending') für private Profile.
+ * Erstellt auch eine follow_request-Notification beim Ziel-User.
+ */
+export async function sendFollowRequest(currentUserId, targetUserId) {
+  const { data, error } = await supabase
+    .from('friendships')
+    .upsert(
+      { user_id: currentUserId, friend_id: targetUserId, status: 'pending' },
+      { onConflict: 'user_id,friend_id' }
+    )
+    .select()
+    .single()
+  if (!error) {
+    await createNotification(targetUserId, currentUserId, 'follow_request')
+  }
+  return { data, error }
+}
+
+/**
+ * Zieht eine ausstehende Follow-Anfrage zurück.
+ */
+export async function withdrawFollowRequest(currentUserId, targetUserId) {
+  return supabase
+    .from('friendships')
+    .delete()
+    .eq('user_id', currentUserId)
+    .eq('friend_id', targetUserId)
+    .eq('status', 'pending')
+}
+
+/**
+ * Akzeptiert eine eingehende Follow-Anfrage.
+ * Setzt status → 'accepted' und sendet eine follow-Notification zurück.
+ */
+export async function acceptFollowRequest(requesterId, currentUserId) {
+  const { error } = await supabase
+    .from('friendships')
+    .update({ status: 'accepted' })
+    .eq('user_id', requesterId)
+    .eq('friend_id', currentUserId)
+    .eq('status', 'pending')
+  if (!error) {
+    await createNotification(requesterId, currentUserId, 'follow')
+  }
+  return { error }
+}
+
+/**
+ * Lehnt eine eingehende Follow-Anfrage ab (löscht den Eintrag).
+ */
+export async function rejectFollowRequest(requesterId, currentUserId) {
+  return supabase
+    .from('friendships')
+    .delete()
+    .eq('user_id', requesterId)
+    .eq('friend_id', currentUserId)
+    .eq('status', 'pending')
 }
 
 export async function unfollowUser(currentUserId, targetUserId) {
