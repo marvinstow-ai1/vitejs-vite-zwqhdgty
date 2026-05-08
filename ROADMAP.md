@@ -61,7 +61,7 @@
 - [x] getFollowCounts() ruft supabase.rpc('get_follow_counts') auf
 - [x] getProfilePublicStub() in profiles.service.js angelegt
 - [x] getFollowers() + getFollowing() in profiles.service.js angelegt
-- [x] loadExplorePosts() + loadExplorePostsMoods() in posts.service.js angelegt
+- [x] loadExplorePosts() + loadExplorePostsMoods() + loadSuggestedUsers() in posts.service.js angelegt
 - [x] showToast() in utils.js angelegt
 - [ ] verbleibende Query-Logik in Pages prüfen
 - [ ] Modal-/Overlay-Logik entkoppeln (`openRepostModal`, `openStoryViewer`)
@@ -101,8 +101,8 @@
 - [x] Follower-/Following-Modal auf Profilseite
 - [x] Story-Viewer: leeres Array → "Story nicht verfügbar" statt Crash
 - [x] Story-Viewer: null media_url → Overlay statt broken img
-- [ ] Feed-Verhalten für eingeloggte User final definieren
-- [ ] Explore weiter verfeinern (erster Stand live)
+- [x] Feed-Verhalten für eingeloggte User final definieren (Feed live mit Posts + Composer)
+- [x] Explore vollständig implementiert: Masonry-Grid, Mood-Filter, Cursor-Pagination, Like/Repost/Comment, Suggested Users (2026-05-08)
 - [ ] Profilseite entkoppeln: Header / Boards / Stories / Reposts / Social Actions
 - [ ] Board-Seite modularisieren
 - [ ] Story-Workflow bereinigen
@@ -128,7 +128,8 @@
 - [x] Social Graph: Follows + Follow-Requests für private Profile
 - [x] Messages: nur Placeholder-Route
 - [x] /messages Placeholder angelegt und in Router verdrahtet
-- [x] Follow-Request-UI: Pending-State, Withdraw, Accept/Reject (2026-05-08)
+- [x] Follow-Request-UI: Pending-State, Withdraw, Accept/Reject in Notifications (2026-05-08)
+- [x] Explore-Seite: echte Posts, Mood-Filter, Suggested Users, Load-More (2026-05-08)
 - [ ] Follow-Auto-Accept / Pending-Trigger
 - [ ] Messages in Navigation erst zeigen wenn echte Funktion folgt
 
@@ -300,3 +301,4 @@
 |---|---|---|
 | 2026-05-08 | RLS + Storage | PR #2 gemerged, 0001/0002/0003 appliziert, 12 Flows getestet |
 | 2026-05-08 | Follow-Request-UI | Phase 6: Pending-State, Withdraw, Accept/Reject in Notifications |
+| 2026-05-08 | Explore-Seite | Phase 4: Masonry-Grid, Mood-Filter-Chips, Cursor-Pagination, Suggested Users, Like/Repost/Comment |

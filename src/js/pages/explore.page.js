@@ -1,29 +1,379 @@
-import { shellHtml, wireShellNav, applyNavPref } from '../shell.js'
+import { shellHtml, wireShellNav, applyNavPref, refreshUnreadBadge } from '../shell.js'
+import { iconSvg, escapeHtml, detectMediaType, renderMediaEl, timeAgo } from '../utils.js'
+import { loadExplorePosts, loadExploreMoodTags, loadSuggestedUsers, loadPostInteractions, loadUsernameMap } from '../services/posts.service.js'
+import { toggleLike, addRepost, removeRepost, getOrCreateRepostsBoardId, loadComments, insertComment } from '../services/interactions.service.js'
+import { notifyAction } from '../services/notify.action.js'
+import { getBoardsByUser } from '../services/boards.service.js'
 import { getUnreadCount } from '../services/notifications.service.js'
-import { refreshUnreadBadge } from '../shell.js'
+import { openCommentsModal, openRepostModal } from './feed.page.js'
+
+// ─── Explore-scoped state ─────────────────────────────────────────────────────
+let exploreMood = null
+let exploreCursor = null
+let exploreLoading = false
+let exploreHasMore = true
+const EXPLORE_LIMIT = 30
+
+// ─── Explore Page ─────────────────────────────────────────────────────────────
 
 /**
- * Zeigt die Explore-Seite (aktuell Placeholder).
+ * Zeigt die Explore-Seite.
  * @param {object} profile
  * @param {{ navigate: function, openComposer: function, toggleNotif: function }} nav
  */
-export function showExplorePage(profile, nav) {
+export async function showExplorePage(profile, nav) {
   applyNavPref()
+  // State zurücksetzen bei jedem Seitenaufruf
+  exploreMood = null
+  exploreCursor = null
+  exploreLoading = false
+  exploreHasMore = true
+
   document.querySelector('#app').innerHTML = `
     <div class="app-shell">
       ${shellHtml('explore', profile)}
       <main class="app-main">
         <header class="topbar">
-          <span style="font-size:16px;font-weight:600;">Explore</span>
+          <span style="font-size:16px;font-weight:600;letter-spacing:.02em;">Explore</span>
         </header>
-        <div style="max-width:640px;margin:0 auto;padding:40px 24px;text-align:center;color:var(--text-mute);font-size:14px;">
-          Explore-Feed kommt bald — hier siehst du dann öffentliche Posts von Leuten, denen du noch nicht folgst.
+
+        <!-- Mood-Filter Chips -->
+        <div id="explore-moods" style="display:flex;gap:8px;padding:10px 14px;overflow-x:auto;scrollbar-width:none;border-bottom:1px solid var(--border);-webkit-overflow-scrolling:touch;flex-shrink:0;">
+          <div style="color:#444;font-size:12px;padding:6px 0;align-self:center;">Lädt…</div>
         </div>
+
+        <!-- Suggested Users -->
+        <div id="explore-suggestions" style="display:none;padding:14px 14px 0;"></div>
+
+        <!-- Post Grid -->
+        <div id="explore-grid" style="columns:3 100px;gap:3px;padding:3px;"></div>
+
+        <!-- Load More -->
+        <div id="explore-more" style="display:none;padding:20px;text-align:center;">
+          <button id="btn-load-more" class="btn" style="min-width:140px;">Mehr laden</button>
+        </div>
+
+        <!-- Empty / Error State -->
+        <div id="explore-state" style="display:none;padding:60px 24px;text-align:center;color:#444;font-size:14px;"></div>
       </main>
     </div>`
 
   wireShellNav(profile, nav)
-  getUnreadCount(profile.id)
-    .then(count => refreshUnreadBadge(count))
-    .catch(() => {})
+  getUnreadCount(profile.id).then(c => refreshUnreadBadge(c)).catch(() => {})
+
+  // Mood-Chips + Suggestions + erste Posts parallel laden
+  _loadMoodChips(profile, nav)
+  _loadSuggestions(profile, nav)
+  await _loadExploreGrid(profile, nav, true)
+
+  document.querySelector('#btn-load-more')?.addEventListener('click', () =>
+    _loadExploreGrid(profile, nav, false)
+  )
+}
+
+// ─── Mood Chips ───────────────────────────────────────────────────────────────
+
+async function _loadMoodChips(profile, nav) {
+  const bar = document.querySelector('#explore-moods')
+  if (!bar) return
+  const moods = await loadExploreMoodTags()
+  if (!moods.length) { bar.style.display = 'none'; return }
+
+  bar.innerHTML = `
+    <button class="mood-chip ${!exploreMood ? 'mood-chip-active' : ''}" data-mood="" style="${_chipStyle(!exploreMood)}">
+      Alle
+    </button>
+    ${moods.map(([mood]) => `
+      <button class="mood-chip ${exploreMood === mood ? 'mood-chip-active' : ''}" data-mood="${mood}" style="${_chipStyle(exploreMood === mood)}">
+        #${mood}
+      </button>`).join('')}`
+
+  bar.querySelectorAll('.mood-chip').forEach(btn => {
+    btn.addEventListener('click', () => {
+      exploreMood = btn.dataset.mood || null
+      exploreCursor = null
+      exploreHasMore = true
+      // Aktiven Chip highlighten
+      bar.querySelectorAll('.mood-chip').forEach(b => {
+        const active = b.dataset.mood === (exploreMood || '')
+        b.style.cssText = _chipStyle(active)
+        b.classList.toggle('mood-chip-active', active)
+      })
+      _loadExploreGrid(profile, nav, true)
+    })
+  })
+}
+
+function _chipStyle(active) {
+  return active
+    ? 'padding:5px 14px;border-radius:999px;border:none;background:#fff;color:#000;font-size:12px;font-weight:500;cursor:pointer;white-space:nowrap;flex-shrink:0;'
+    : 'padding:5px 14px;border-radius:999px;border:1px solid #2a2a2a;background:transparent;color:#888;font-size:12px;cursor:pointer;white-space:nowrap;flex-shrink:0;'
+}
+
+// ─── Suggested Users ──────────────────────────────────────────────────────────
+
+async function _loadSuggestions(profile, nav) {
+  const wrap = document.querySelector('#explore-suggestions')
+  if (!wrap) return
+  const users = await loadSuggestedUsers(profile.id, 6)
+  if (!users.length) return
+
+  wrap.style.display = 'block'
+  wrap.innerHTML = `
+    <div style="font-size:11px;color:#555;text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px;">Vorschläge für dich</div>
+    <div style="display:flex;gap:10px;overflow-x:auto;scrollbar-width:none;padding-bottom:14px;-webkit-overflow-scrolling:touch;">
+      ${users.map(u => `
+        <div class="suggest-card" data-username="${u.username}" style="flex-shrink:0;width:100px;cursor:pointer;text-align:center;">
+          <div style="width:52px;height:52px;border-radius:50%;background:#1a1a1a;border:1px solid #2a2a2a;display:flex;align-items:center;justify-content:center;font-size:20px;color:#fff;margin:0 auto 6px;">
+            ${u.username[0].toUpperCase()}
+          </div>
+          <div style="font-size:11px;color:#ccc;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">@${escapeHtml(u.username)}</div>
+          ${u.followerCount ? `<div style="font-size:10px;color:#555;margin-top:2px;">${u.followerCount} Follower</div>` : ''}
+        </div>`).join('')}
+    </div>
+    <div style="height:1px;background:var(--border);margin-bottom:4px;"></div>`
+
+  wrap.querySelectorAll('.suggest-card').forEach(card => {
+    card.addEventListener('click', () => nav.navigate('/u/' + card.dataset.username))
+  })
+}
+
+// ─── Grid laden ───────────────────────────────────────────────────────────────
+
+async function _loadExploreGrid(profile, nav, reset) {
+  if (exploreLoading) return
+  exploreLoading = true
+
+  const grid = document.querySelector('#explore-grid')
+  const moreBtn = document.querySelector('#explore-more')
+  const state = document.querySelector('#explore-state')
+  if (!grid) { exploreLoading = false; return }
+
+  if (reset) {
+    grid.innerHTML = `<div style="grid-column:1/-1;color:#444;font-size:12px;text-align:center;padding:24px;">Lädt…</div>`
+    state.style.display = 'none'
+    if (moreBtn) moreBtn.style.display = 'none'
+    exploreCursor = null
+    exploreHasMore = true
+  }
+
+  const { posts, error } = await loadExplorePosts(profile.id, exploreMood, EXPLORE_LIMIT, exploreCursor)
+  exploreLoading = false
+
+  if (error) {
+    if (reset) grid.innerHTML = ''
+    state.style.display = 'block'
+    state.innerHTML = `<div style="font-size:28px;margin-bottom:10px;">😶</div><p>Konnte Explore nicht laden.</p>`
+    return
+  }
+
+  if (!posts.length && reset) {
+    grid.innerHTML = ''
+    state.style.display = 'block'
+    state.innerHTML = exploreMood
+      ? `<div style="font-size:28px;margin-bottom:10px;">🌫️</div><p style="color:#555;">Keine öffentlichen Posts mit #${exploreMood}.</p>`
+      : `<div style="font-size:28px;margin-bottom:10px;">🌱</div><p style="color:#555;">Noch keine öffentlichen Posts zum Entdecken.</p>`
+    return
+  }
+
+  // Cursor für nächste Seite
+  if (posts.length > 0) {
+    exploreCursor = posts[posts.length - 1].created_at
+  }
+  exploreHasMore = posts.length === EXPLORE_LIMIT
+
+  // Interaktionen + Usernamen laden
+  const userIds = [...new Set(posts.map(p => p.user_id))]
+  const [usernameMap, interactions] = await Promise.all([
+    loadUsernameMap(userIds),
+    loadPostInteractions(posts.map(p => p.id), profile.id),
+  ])
+
+  if (reset) grid.innerHTML = ''
+
+  const fragment = posts.map(p => _renderExploreCard(p, profile.id, usernameMap, interactions)).join('')
+  grid.insertAdjacentHTML('beforeend', fragment)
+
+  _wireExploreActions(profile, nav)
+
+  if (moreBtn) moreBtn.style.display = exploreHasMore ? 'block' : 'none'
+}
+
+// ─── Card Render ──────────────────────────────────────────────────────────────
+
+function _renderExploreCard(post, currentUserId, usernameMap, interactions) {
+  const { likeCounts, userLikedSet, commentCounts, repostCounts, userRepostedSet } = interactions
+  const liked = userLikedSet.has(post.id)
+  const reposted = userRepostedSet.has(post.id)
+  const lc = likeCounts[post.id] || 0
+  const cc = commentCounts[post.id] || 0
+  const rc = repostCounts[post.id] || 0
+  const username = usernameMap[post.user_id] || 'unknown'
+  const mt = post.media_type || detectMediaType(post.media_url)
+  const isEmbed = mt === 'youtube' || mt === 'instagram'
+
+  return `
+    <div class="explore-card" data-post-id="${post.id}" style="break-inside:avoid;margin-bottom:3px;position:relative;background:#111;border-radius:4px;overflow:hidden;cursor:pointer;">
+      <div class="explore-media" data-post-id="${post.id}" data-media-url="${escapeHtml(post.media_url || '')}" data-media-type="${mt}" data-owner-id="${post.user_id}" style="position:relative;">
+        ${renderMediaEl(post.media_url, mt, { borderRadius: '0' })}
+      </div>
+      <!-- Hover Overlay -->
+      <div class="explore-overlay" style="position:absolute;inset:0;background:rgba(0,0,0,0);display:flex;flex-direction:column;justify-content:flex-end;padding:8px;opacity:0;transition:opacity .18s;pointer-events:none;">
+        <div style="display:flex;align-items:center;justify-content:space-between;">
+          <span class="explore-username" data-username="${username}" style="font-size:11px;color:rgba(255,255,255,0.85);pointer-events:all;cursor:pointer;max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">@${username}</span>
+          <div style="display:flex;gap:6px;align-items:center;">
+            <span style="font-size:11px;color:rgba(255,255,255,0.7);">♥ ${lc}</span>
+            <span style="font-size:11px;color:rgba(255,255,255,0.7);">💬 ${cc}</span>
+          </div>
+        </div>
+        ${post.mood ? `<span class="explore-mood-tag" data-mood="${post.mood}" style="font-size:10px;color:rgba(255,255,255,0.5);margin-top:3px;pointer-events:all;cursor:pointer;">#${post.mood}</span>` : ''}
+      </div>
+      <!-- Action Bar (immer sichtbar auf Mobile) -->
+      <div class="explore-actions" style="display:flex;align-items:center;gap:2px;padding:4px 6px;background:rgba(0,0,0,0.6);">
+        <button class="explore-like-btn" data-post-id="${post.id}" data-liked="${liked}" data-owner-id="${post.user_id}" style="display:flex;align-items:center;gap:2px;background:none;border:none;cursor:pointer;color:${liked ? '#ff4d6d' : '#888'};font-size:11px;padding:3px 4px;border-radius:4px;flex:1;justify-content:center;">
+          <span class="explore-like-icon" style="font-size:13px;">${liked ? '♥' : '♡'}</span>
+          <span class="explore-like-count" data-post-id="${post.id}">${lc}</span>
+        </button>
+        <button class="explore-comment-btn" data-post-id="${post.id}" data-media-url="${escapeHtml(post.media_url || '')}" data-media-type="${mt}" data-owner-id="${post.user_id}" style="display:flex;align-items:center;gap:2px;background:none;border:none;cursor:pointer;color:#888;font-size:11px;padding:3px 4px;border-radius:4px;flex:1;justify-content:center;">
+          <span style="font-size:13px;">💬</span>
+          <span class="explore-comment-count" data-post-id="${post.id}">${cc}</span>
+        </button>
+        <button class="explore-repost-btn" data-post-id="${post.id}" data-reposted="${reposted}" data-owner-id="${post.user_id}" style="display:flex;align-items:center;gap:2px;background:none;border:none;cursor:pointer;color:${reposted ? '#06d6a0' : '#888'};font-size:11px;padding:3px 4px;border-radius:4px;flex:1;justify-content:center;">
+          <span style="font-size:13px;">🔁</span>
+          <span class="explore-repost-count" data-post-id="${post.id}">${rc}</span>
+        </button>
+      </div>
+    </div>`
+}
+
+// ─── Wire Actions ─────────────────────────────────────────────────────────────
+
+function _wireExploreActions(profile, nav) {
+  // Hover-Overlay auf Desktop
+  document.querySelectorAll('#explore-grid .explore-card').forEach(card => {
+    const overlay = card.querySelector('.explore-overlay')
+    if (!overlay) return
+    card.addEventListener('mouseenter', () => {
+      overlay.style.opacity = '1'
+      overlay.style.background = 'rgba(0,0,0,0.45)'
+    })
+    card.addEventListener('mouseleave', () => {
+      overlay.style.opacity = '0'
+      overlay.style.background = 'rgba(0,0,0,0)'
+    })
+  })
+
+  // Media-Klick → Comments Modal
+  document.querySelectorAll('#explore-grid .explore-media').forEach(wrap => {
+    if (wrap.dataset.mediaType === 'youtube' || wrap.dataset.mediaType === 'instagram') return
+    wrap.addEventListener('click', () => openCommentsModal(
+      wrap.dataset.postId, wrap.dataset.mediaUrl, wrap.dataset.mediaType, profile.id, wrap.dataset.ownerId
+    ))
+  })
+
+  // Username-Klick → Profil
+  document.querySelectorAll('#explore-grid .explore-username').forEach(el => {
+    el.addEventListener('click', (e) => { e.stopPropagation(); nav.navigate('/u/' + el.dataset.username) })
+  })
+
+  // Mood-Tag-Klick → Filter setzen
+  document.querySelectorAll('#explore-grid .explore-mood-tag').forEach(tag => {
+    tag.addEventListener('click', (e) => {
+      e.stopPropagation()
+      exploreMood = tag.dataset.mood
+      exploreCursor = null
+      exploreHasMore = true
+      // Chips aktualisieren
+      document.querySelectorAll('#explore-moods .mood-chip').forEach(b => {
+        const active = b.dataset.mood === exploreMood
+        b.style.cssText = _chipStyle(active)
+      })
+      _loadExploreGrid(profile, nav, true)
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    })
+  })
+
+  // Like
+  document.querySelectorAll('#explore-grid .explore-like-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => { e.stopPropagation(); _handleExploreLike(btn, profile.id) })
+  })
+
+  // Comment
+  document.querySelectorAll('#explore-grid .explore-comment-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation()
+      openCommentsModal(btn.dataset.postId, btn.dataset.mediaUrl, btn.dataset.mediaType, profile.id, btn.dataset.ownerId)
+    })
+  })
+
+  // Repost
+  document.querySelectorAll('#explore-grid .explore-repost-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => { e.stopPropagation(); _handleExploreRepost(btn, profile.id) })
+  })
+}
+
+// ─── Like Handler ─────────────────────────────────────────────────────────────
+
+async function _handleExploreLike(btn, currentUserId) {
+  const postId = btn.dataset.postId
+  const liked = btn.dataset.liked === 'true'
+  const ownerId = btn.dataset.ownerId
+  const countEl = btn.querySelector('.explore-like-count')
+  const iconEl = btn.querySelector('.explore-like-icon')
+  const current = parseInt(countEl?.textContent || '0')
+
+  // Optimistic UI
+  btn.dataset.liked = String(!liked)
+  btn.style.color = !liked ? '#ff4d6d' : '#888'
+  if (iconEl) iconEl.textContent = !liked ? '♥' : '♡'
+  if (countEl) countEl.textContent = !liked ? current + 1 : Math.max(0, current - 1)
+
+  const { error } = await toggleLike(postId, currentUserId, liked, ownerId)
+  if (error) {
+    // Rollback
+    btn.dataset.liked = String(liked)
+    btn.style.color = liked ? '#ff4d6d' : '#888'
+    if (iconEl) iconEl.textContent = liked ? '♥' : '♡'
+    if (countEl) countEl.textContent = current
+  } else if (!liked && ownerId) {
+    notifyAction(ownerId, currentUserId, 'like').catch(() => {})
+  }
+}
+
+// ─── Repost Handler ───────────────────────────────────────────────────────────
+
+async function _handleExploreRepost(btn, currentUserId) {
+  const postId = btn.dataset.postId
+  const reposted = btn.dataset.reposted === 'true'
+  const ownerId = btn.dataset.ownerId
+  const countEl = btn.querySelector('.explore-repost-count')
+  const current = parseInt(countEl?.textContent || '0')
+
+  if (reposted) {
+    btn.dataset.reposted = 'false'
+    btn.style.color = '#888'
+    if (countEl) countEl.textContent = Math.max(0, current - 1)
+    const { error } = await removeRepost(postId, currentUserId)
+    if (error) {
+      btn.dataset.reposted = 'true'
+      btn.style.color = '#06d6a0'
+      if (countEl) countEl.textContent = current
+    }
+    return
+  }
+
+  const boards = await getBoardsByUser(currentUserId)
+  openRepostModal(boards, async ({ boardId, showOnProfile }) => {
+    btn.dataset.reposted = 'true'
+    btn.style.color = '#06d6a0'
+    if (countEl) countEl.textContent = current + 1
+    const { error } = await addRepost(postId, currentUserId, ownerId, { boardId, showOnProfile })
+    if (error) {
+      btn.dataset.reposted = 'false'
+      btn.style.color = '#888'
+      if (countEl) countEl.textContent = current
+    } else if (ownerId) {
+      notifyAction(ownerId, currentUserId, 'repost').catch(() => {})
+    }
+  })
 }
