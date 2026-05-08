@@ -14,6 +14,22 @@ import { searchProfiles } from '../services/profiles.service.js'
 let activeMood = null
 let searchTimeout = null
 
+// ─── Toast ────────────────────────────────────────────────────────────────────
+
+function _showToast(msg) {
+  let el = document.querySelector('#feed-toast')
+  if (!el) {
+    el = document.createElement('div')
+    el.id = 'feed-toast'
+    el.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#1a1a1a;color:#ccc;font-size:13px;padding:9px 18px;border-radius:20px;border:1px solid #333;z-index:9999;pointer-events:none;transition:opacity .3s;white-space:nowrap;'
+    document.body.appendChild(el)
+  }
+  el.textContent = msg
+  el.style.opacity = '1'
+  clearTimeout(el._t)
+  el._t = setTimeout(() => { el.style.opacity = '0' }, 2500)
+}
+
 // ─── Feed Page ────────────────────────────────────────────────────────────────
 
 /**
@@ -284,6 +300,7 @@ async function _handleLike(btn, currentUserId) {
     btn.style.color = liked ? '#ff4d6d' : '#555'
     if (iconEl) iconEl.textContent = liked ? '♥' : '♡'
     if (countEl) countEl.textContent = current
+    _showToast('Like fehlgeschlagen — Post nicht mehr sichtbar?')
   }
 }
 
@@ -303,6 +320,7 @@ async function _handleRepost(btn, currentUserId) {
       btn.dataset.reposted = 'true'
       btn.style.color = '#06d6a0'
       if (countEl) countEl.textContent = current
+      _showToast('Repost konnte nicht entfernt werden.')
     }
     return
   }
@@ -318,6 +336,7 @@ async function _handleRepost(btn, currentUserId) {
       btn.dataset.reposted = 'false'
       btn.style.color = '#555'
       if (countEl) countEl.textContent = current
+      _showToast('Repost fehlgeschlagen — Post nicht mehr sichtbar?')
     }
   })
 }

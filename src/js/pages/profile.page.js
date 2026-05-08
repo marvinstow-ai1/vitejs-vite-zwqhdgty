@@ -1,6 +1,6 @@
 import { supabase } from '../supabase.js'
 import { getSession } from '../services/auth.service.js'
-import { getProfileByUsername, updateProfile, getFollowCounts, getRelationshipStatus } from '../services/profiles.service.js'
+import { getProfileByUsername, updateProfile, getFollowCounts, getRelationshipStatus, getProfilePublicStub } from '../services/profiles.service.js'
 import { getVisiblePostIds } from '../services/posts.service.js'
 import { followUser, unfollowUser, blockUser, unblockUser } from '../services/interactions.service.js'
 import { notifyAction } from '../services/notify.action.js'
@@ -26,10 +26,23 @@ export async function showProfilePage(username, ctx) {
   const profile = await getProfileByUsername(username)
 
   if (!profile) {
-    app.innerHTML = `<div style="background:#0a0a0a;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;">
-      <p style="color:#555;font-size:14px;">Profil nicht gefunden</p>
-      <button onclick="history.back()" style="padding:8px 20px;background:transparent;color:#666;border:1px solid #333;border-radius:8px;cursor:pointer;font-size:13px;">Zurück</button>
-    </div>`
+    // After RLS is active, private profiles return null from getProfileByUsername.
+    // Use the stub RPC to distinguish "private / followers-only" from "not found".
+    const stub = await getProfilePublicStub(username)
+    if (stub && stub.profile_privacy !== 'public') {
+      const label = stub.profile_privacy === 'private' ? 'Dieses Profil ist privat.' : 'Nur Follower können dieses Profil sehen.'
+      app.innerHTML = `<div style="background:#0a0a0a;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:24px;">
+        <div style="font-size:42px;">🔒</div>
+        <p style="color:#888;font-size:15px;font-weight:500;">@${stub.username}</p>
+        <p style="color:#555;font-size:14px;text-align:center;max-width:280px;">${label}</p>
+        <button onclick="history.back()" style="padding:8px 20px;background:transparent;color:#666;border:1px solid #333;border-radius:8px;cursor:pointer;font-size:13px;">Zurück</button>
+      </div>`
+    } else {
+      app.innerHTML = `<div style="background:#0a0a0a;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;">
+        <p style="color:#555;font-size:14px;">Profil nicht gefunden</p>
+        <button onclick="history.back()" style="padding:8px 20px;background:transparent;color:#666;border:1px solid #333;border-radius:8px;cursor:pointer;font-size:13px;">Zurück</button>
+      </div>`
+    }
     return
   }
 

@@ -7,7 +7,7 @@ const handlers = {}
 
 /**
  * Registriert Page-Handler.
- * @param {object} map — { init, feed, profile, board, explore, settings }
+ * @param {object} map — { init, feed, profile, board, explore, settings, legal, landing }
  */
 export function registerHandlers(map) {
   Object.assign(handlers, map)
@@ -34,6 +34,14 @@ export function handleRoute() {
     handlers.settings?.()
   } else if (path === '/explore') {
     handlers.explore?.()
+  } else if (path === '/impressum') {
+    handlers.legal?.('impressum')
+  } else if (path === '/datenschutz') {
+    handlers.legal?.('datenschutz')
+  } else if (path === '/nutzungsbedingungen') {
+    handlers.legal?.('nutzungsbedingungen')
+  } else if (path === '/messages') {
+    handlers.messages?.()
   } else if (boardMatch) {
     handlers.board?.(boardMatch[1], boardMatch[2])
   } else if (profileMatch) {

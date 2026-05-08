@@ -9,13 +9,13 @@
 - [x] erste klare Page-Module anlegen (Feed, Profile, Explore, Settings, Board, Auth)
 - [x] Single-SPA-Grundstruktur vorbereiten
 - [x] Legacy-HTMLs (`feed.html`, `explore.html`, `profile.html`) entfernt — nur noch `index.html`
-- [ ] offene Produktentscheidung festziehen: `/` = Landing, Feed oder Redirect (Phase 6)
+- [x] offene Produktentscheidung: `/` = Landing für Gäste, Feed für eingeloggte User
 
 ## Phase 2 — Service Layer / Datenzugriff
 
 - [x] Supabase-Client-Konfiguration isoliert halten
 - [x] Auth-Service ausgelagert
-- [x] Profiles-Service angelegt (jetzt inkl. `getRelationshipStatus`, `getMyBlocks`)
+- [x] Profiles-Service angelegt (inkl. `getRelationshipStatus`, `getMyBlocks`, `getFollowCounts`, `getProfilePublicStub`)
 - [x] Posts-Service angelegt
 - [x] Interactions-Service angelegt
 - [x] Notifications-Service angelegt
@@ -35,49 +35,33 @@
 
 ## Phase 3 — RLS / Schema / Permissions
 
-- [x] komplettes RLS-Audit für alle genutzten Tabellen durchführen → `docs/PHASE3_RLS_AUDIT.md`
-- [x] Migrations-Entwurf für RLS + Schema-Härtung → `supabase/migrations/0001_phase3_rls.sql`
-- [x] Frontend-Sichtbarkeitslogik klar als UX-Filter markiert (`getVisiblePostIds`)
-- [x] Trusted-Action-Seam für Notifications (`services/notify.action.js`) — single point für Phase-7-Migration
-- [ ] Migration auf einer Supabase-Branch testen (manuell, nicht durch den Agent)
-- [ ] RLS aktivieren, Policy für Policy:
-  - [ ] profiles
-  - [ ] posts
-  - [ ] boards
-  - [ ] board_posts
-  - [ ] reposts
-  - [ ] stories
-  - [ ] story_views
-  - [ ] friendships
-  - [ ] blocks
-  - [ ] likes
-  - [ ] comments
-  - [ ] notifications
-- [ ] `posts.visibility` CHECK + Default + NOT NULL aktivieren
-- [ ] `reposts.show_on_profile` Default + NOT NULL nach Backfill
-- [ ] NULL-/Cascade-Verhalten bei Posts / Boards / Reposts / Zuordnungstabellen prüfen
-- [ ] Storage-Bucket-RLS für `images`, `videos`, `headers`, `stories` setzen
-- [ ] klären, ob `friendships` zu `follows` migriert oder erweitert werden soll (Phase 6 Antwort)
-- [ ] prüfen, ob Reposts + `board_posts` aktuell redundanten Zustand erzeugen
-- [ ] Like-/Comment-/Repost-/Board-Insert-Regeln an Post-Sichtbarkeit koppeln (im Migrations-Entwurf)
-- [ ] Story-View-Insert-Regeln an Story-Sichtbarkeit koppeln (im Migrations-Entwurf)
-- [ ] relevante Indexe für RLS-/Visibility-Queries prüfen (im Migrations-Entwurf)
+- [x] komplettes RLS-Audit für alle genutzten Tabellen → `docs/PHASE3_RLS_AUDIT.md`
+- [x] Step 1 appliziert: SECURITY DEFINER Helpers + 8 Performance-Indexe (`0001_phase3_rls.sql`)
+- [x] `0002_phase3_strict_policies.sql` erstellt — enthält alle RLS-Policies + 2 neue SECURITY DEFINER Helper (`get_follow_counts`, `get_profile_public_stub`)
+- [x] `0003_phase3_storage_policies.sql` erstellt — Storage-Policies für images, videos, headers, stories
+- [x] Follower-Counts-Fix: `getFollowCounts()` nutzt jetzt `get_follow_counts()` RPC statt owner-scoped Query
+- [x] Private-Profil-Fix: `profile.page.js` unterscheidet via `getProfilePublicStub()` zwischen "nicht gefunden" und "privat/followers-only"
+- [x] Feed-Interaktion-Fix: Like/Repost zeigen Toast bei RLS-Fehler statt silent fail
+- [ ] **0002 menschlich reviewen + im Supabase SQL Editor applizieren** ← nächster Schritt
+- [ ] **0003 menschlich reviewen + applizieren** (Storage-Buckets images/videos/headers/stories bestätigen)
 - [ ] `getVisiblePostIds()` entfernen, sobald RLS scharf
-- [ ] Notifications nicht mehr als reine Client-Vertrauenslogik (Phase 7 Edge Function)
+- [ ] `posts.visibility` / `boards.visibility` / `profile_privacy` nach Backfill auf NOT NULL
+- [ ] ungenutzte moodboard-Bucket-Policies entfernen (falls vorhanden)
+- [ ] Notifications nicht mehr als reine Client-Vertrauenslogik → Phase 7 Edge Function
 
 ## Phase 4 — Kernfunktionen stabilisieren
 
 - [x] echten Feed-Inhalt in `showFeed()`
 - [x] `loadFeedPosts()` an Feed-Rendering
 - [x] Feed-Interaktionen (Like, Repost, Comment, Profil-Navigation, Mood-Filter)
+- [x] Private Profilseite zeigt Lock-State statt White Screen
+- [x] Story-Viewer non-owner: leere Viewer-Liste kein Crash (war bereits sicher via `|| []` + isOwn-Guard)
 - [ ] Feed-Verhalten für eingeloggte User final definieren
 - [ ] Explore von Placeholder zu echter Discovery-Seite ausbauen
 - [ ] Profilseite weiter entkoppeln (Header / Boards / Stories / Reposts / Social Actions)
 - [ ] Board-Seite weiter modularisieren
-- [ ] Story-Workflow weiter bereinigen
-- [ ] Stories beziehungsbasiert statt global/noisy
+- [ ] Follow-Request-UI (Pending-State, Withdraw, Accept/Reject)
 - [ ] Repost-Verhalten logisch vereinheitlichen
-- [ ] doppelten Follow-/Visibility-Aufwand in Services reduzieren
 
 ## Phase 5 — Mobile-first / CSS Cleanup
 
@@ -88,27 +72,78 @@
 - [ ] Board-Grids mobil sauber abstufen
 - [ ] Modals für mobile Nutzung verbessern
 - [ ] Bottom-Navigation und Touch-Ziele weiter vereinheitlichen
-- [ ] Desktop-lastige Layout-Reste umbauen
 - [ ] Feed-Grid im echten schmalen Viewport testen
 
 ## Phase 6 — Produktentscheidungen
 
-- [ ] Landing-Verhalten (`/`): Landing | Home Feed | Profil-Redirect
-- [ ] Social-Graph-Modell: echte Freundschaften | Follows | Follows + Requests
-- [ ] Messages-Scope: jetzt | Placeholder-Route | später
+- [x] Landing-Verhalten (`/`): Landing für Gäste, Feed für eingeloggte User
+- [x] Social-Graph-Modell: Follows + Follow-Requests für private Profile
+- [x] Messages: Placeholder-Route `/messages` angelegt
+- [ ] Follow-Request-UI implementieren
+- [ ] Follow-Auto-Accept / Pending-Trigger für private Profile
 
 ## Phase 7 — Trusted Actions / Edge Functions
 
-- [ ] Notification-Erstellung als Edge Function (Body von `notifyAction()` ersetzen)
-- [ ] Follow/Unfollow/Block-Side-Effects prüfen
-- [ ] Repost-Ablauf atomar (`reposts` + `board_posts` + Notification)
-- [ ] Story-Publishing / Story-Expiry serverseitig (pg_cron oder Edge)
-- [ ] Explore-/Aggregation-Logik serverseitig bewerten
+- [x] `notify.action.js` Seam angelegt (single point für spätere Edge-Function-Migration)
+- [x] Repost-Atomizität geplant
+- [x] Story-Expiry geplant
+- [ ] Notification-Erstellung als Edge Function (Body von `notifyAction()` ersetzen, `notifications_insert` Policy löschen)
+- [ ] Repost-Ablauf atomar (`reposts` + `board_posts` + Notification in einer DB Function / Edge Function)
+- [ ] Story-Expiry serverseitig (pg_cron oder scheduled Edge Function)
 
 ## Phase 8 — Cleanup / Tech Debt
 
-- [ ] `interactions.service.js#createNotification` Re-Export entfernen, sobald keine Aufrufer
+- [x] Roadmap im Repo dokumentiert
 - [ ] `getVisiblePostIds()` entfernen, sobald RLS aktiv
+- [ ] `interactions.service.js#createNotification` Re-Export entfernen, sobald keine Aufrufer mehr
 - [ ] leere / nicht genutzte Dateien prüfen
 - [ ] zirkuläre Import-Risiken vermeiden
 - [ ] Modal-Logik aus `feed.page.js` in gemeinsame Schicht
+
+## Phase 9 — Fokus Mode
+
+- [ ] Fokus Mode als Toggle oder eigener Tab konzipieren
+- [ ] Kommentare im Fokus Mode ausblenden
+- [ ] UI extrem reduzieren, größere Bilder
+- [ ] Dia-Modus / Lean-back-Modus ausarbeiten
+- [ ] Regelbasierte Mood-/Need-Erkennung (kein ML)
+- [ ] Lieblingsbilder + Kategorien als Basis
+
+## Phase 10 — Feature / UX / Design Backlog
+
+### Ready / konkretisieren
+- [ ] Feed bildfokussierter, weniger Lärm
+- [ ] Meta-Infos im Feed reduzieren
+- [ ] Calm UI weiterdenken
+- [ ] Empty States atmosphärischer
+
+### Kreative Features
+- [ ] Ambient Mode weiterdenken
+- [ ] Pixel Screensaver / Idle Mode
+- [ ] Cursor Trail
+- [ ] Haptic Feedback mobile
+- [ ] Share-Link pro Item
+- [ ] Daily Mood Check-in
+
+### Avatar / Identity Layer
+- [ ] Tamagotchi-/Pixel-Avatar weiterdenken
+- [ ] Avatar-Reaktionen auf Mood, Aktivität, Tageszeit
+
+## Phase 11 — Landing / Legal / Onboarding
+
+### Pflicht
+- [x] Gäste-Landing gestaltet: atmosphärisch, Mood-Mosaic, minimaler Text, starke CTA
+- [x] `/impressum` — Pflichtangaben mit Platzhaltern [YOUR NAME], [YOUR ADDRESS] etc.
+- [x] `/datenschutz` — Supabase, Vercel, localStorage-Session, Rechte, Kontolöschung
+- [x] `/nutzungsbedingungen` — Regeln, verbotene Inhalte, Haftungsausschluss
+- [x] Footer mit Legal-Links auf Landing, Login, Username-Setup, Impressum, Datenschutz, Nutzungsbedingungen
+- [x] Login-Seite konsistent mit Landing-Ästhetik (dunkles Minimal-Design)
+- [x] Signup-Flow: Username + optionales Profilbild
+- [ ] **Platzhalter [YOUR NAME], [YOUR ADDRESS], [YOUR EMAIL], [YOUR DOMAIN] vor Main-Merge ersetzen**
+- [ ] Cookie-Banner prüfen (derzeit nur localStorage-Session, kein Tracking → vermutlich kein Banner nötig)
+
+### Nice-to-have
+- [ ] /about Seite
+- [ ] Onboarding-Screens nach erstem Login
+- [ ] E-Mail-Bestätigung bei Signup prüfen (Supabase Email Auth)
+- [ ] Pre-Launch Waitlist oder Invite-only Zugangsmodus

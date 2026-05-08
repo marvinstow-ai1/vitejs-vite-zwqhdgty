@@ -10,6 +10,8 @@ import { showExplorePage } from './pages/explore.page.js'
 import { showSettingsPage } from './pages/settings.page.js'
 import { showBoardPage } from './pages/board.page.js'
 import { openRepostModal } from './pages/feed.page.js'
+import { showLanding } from './pages/landing.page.js'
+import { showImpressum, showDatenschutz, showNutzungsbedingungen } from './pages/legal.page.js'
 
 // ─── App-level state ──────────────────────────────────────────────────────────
 
@@ -40,7 +42,11 @@ function getNavCallbacks() {
 
 async function init() {
   const session = await getSession()
-  if (!session) { showLogin(init); return }
+  if (!session) {
+    // Show atmospheric landing for guests; CTA leads to the login/signup page.
+    showLanding(() => showLogin(init))
+    return
+  }
 
   const profile = await getProfileById(session.user.id)
   if (!profile?.username) {
@@ -67,10 +73,9 @@ registerHandlers({
   },
 
   async explore() {
-    // Ensure we have a profile for the shell
     if (!currentProfile) {
       const session = await getSession()
-      if (!session) { showLogin(init); return }
+      if (!session) { showLanding(() => showLogin(init)); return }
       currentProfile = await getProfileById(session.user.id)
       if (!currentProfile?.username) { init(); return }
     }
@@ -79,11 +84,11 @@ registerHandlers({
 
   async settings() {
     const session = await getSession()
-    if (!session) { showLogin(init); return }
+    if (!session) { showLanding(() => showLogin(init)); return }
     if (!currentProfile) {
       currentProfile = await getProfileById(session.user.id)
     }
-    if (!currentProfile) { showLogin(init); return }
+    if (!currentProfile) { showLanding(() => showLogin(init)); return }
     await showSettingsPage(currentProfile, session, {
       ...getNavCallbacks(),
       realtimeChannel,
@@ -96,6 +101,20 @@ registerHandlers({
       navigate,
       openRepostModal: (boards, cb) => openRepostModal(boards, cb),
     })
+  },
+
+  messages() {
+    const app = document.querySelector('#app')
+    app.innerHTML = `<div style="background:#0a0a0a;min-height:100vh;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:16px;padding:24px;">
+      <p style="color:#444;font-size:14px;">Nachrichten — bald verfügbar.</p>
+      <button onclick="history.back()" style="padding:8px 20px;background:transparent;color:#555;border:1px solid #2a2a2a;border-radius:8px;cursor:pointer;font-size:13px;">Zurück</button>
+    </div>`
+  },
+
+  legal(page) {
+    if (page === 'impressum') showImpressum()
+    else if (page === 'datenschutz') showDatenschutz()
+    else if (page === 'nutzungsbedingungen') showNutzungsbedingungen()
   },
 })
 

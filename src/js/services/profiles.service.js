@@ -112,23 +112,27 @@ export async function getMyBlocks(viewerId) {
 
 /**
  * Gibt Follower- und Following-Anzahl zurück.
+ * Uses the get_follow_counts() SECURITY DEFINER RPC so the RLS policy on
+ * friendships (owner-scoped) does not prevent counting another user's followers.
  * @param {string} profileId
  */
 export async function getFollowCounts(profileId) {
-  const [followerRes, followingRes] = await Promise.all([
-    supabase
-      .from('friendships')
-      .select('*', { count: 'exact', head: true })
-      .eq('friend_id', profileId)
-      .eq('status', 'accepted'),
-    supabase
-      .from('friendships')
-      .select('*', { count: 'exact', head: true })
-      .eq('user_id', profileId)
-      .eq('status', 'accepted'),
-  ])
+  const { data } = await supabase.rpc('get_follow_counts', { target_user: profileId })
+  const row = data?.[0]
   return {
-    followerCount: followerRes.count || 0,
-    followingCount: followingRes.count || 0,
+    followerCount: Number(row?.follower_count ?? 0),
+    followingCount: Number(row?.following_count ?? 0),
   }
+}
+
+/**
+ * Returns the minimum public info for a username regardless of privacy.
+ * Used to distinguish "profile is private" from "profile not found" after
+ * RLS is active (a private profile returns null from getProfileByUsername).
+ * @param {string} username
+ * @returns {Promise<{ id: string, username: string, display_name: string, profile_privacy: string }|null>}
+ */
+export async function getProfilePublicStub(username) {
+  const { data } = await supabase.rpc('get_profile_public_stub', { p_username: username.toLowerCase() })
+  return data?.[0] ?? null
 }
