@@ -1,4 +1,4 @@
-import { shellHtml, wireShellNav, applyNavPref, refreshUnreadBadge } from '../shell.js'
+import { shellHtml, wireShellNav, applyNavPref, refreshUnreadBadge, renderGlobalHeader, refreshGlobalHeaderBadge } from '../shell.js'
 import { iconSvg, escapeHtml, detectMediaType, renderMediaEl, timeAgo } from '../utils.js'
 import { loadExplorePosts, loadExploreMoodTags, loadSuggestedUsers, loadPostInteractions, loadUsernameMap } from '../services/posts.service.js'
 import { toggleLike, addRepost, removeRepost, getOrCreateRepostsBoardId, loadComments, insertComment } from '../services/interactions.service.js'
@@ -55,6 +55,9 @@ function _getExploreObserver() {
  */
 export async function showExplorePage(profile, nav) {
   applyNavPref()
+  document.body.classList.add('has-global-header')
+  document.body.classList.remove('profile-page')
+
   // State zurücksetzen bei jedem Seitenaufruf
   exploreMood = null
   exploreCursor = null
@@ -67,10 +70,6 @@ export async function showExplorePage(profile, nav) {
     <div class="app-shell">
       ${shellHtml('explore', profile)}
       <main class="app-main">
-        <header class="topbar">
-          <span style="font-size:16px;font-weight:600;letter-spacing:.02em;">Explore</span>
-        </header>
-
         <!-- Mood-Filter Chips -->
         <div id="explore-moods" style="display:flex;gap:8px;padding:10px 14px;overflow-x:auto;scrollbar-width:none;border-bottom:1px solid var(--border);-webkit-overflow-scrolling:touch;flex-shrink:0;">
           <div style="color:#444;font-size:12px;padding:6px 0;align-self:center;">Lädt…</div>
@@ -92,8 +91,18 @@ export async function showExplorePage(profile, nav) {
       </main>
     </div>`
 
+  // Globaler Header
+  renderGlobalHeader(profile, nav, {
+    tone: 'auto',
+    title: 'Explore',
+    showCompose: true,
+  })
+
   wireShellNav(profile, nav)
-  getUnreadCount(profile.id).then(c => refreshUnreadBadge(c)).catch(() => {})
+  getUnreadCount(profile.id).then(c => {
+    refreshUnreadBadge(c)
+    refreshGlobalHeaderBadge(c)
+  }).catch(() => {})
 
   // Mood-Chips + Suggestions + erste Posts parallel laden
   _loadMoodChips(profile, nav)

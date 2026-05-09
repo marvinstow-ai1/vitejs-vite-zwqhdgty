@@ -1,5 +1,5 @@
 import { supabase } from '../supabase.js'
-import { shellHtml, wireShellNav, applyNavPref, refreshUnreadBadge } from '../shell.js'
+import { shellHtml, wireShellNav, applyNavPref, refreshUnreadBadge, renderGlobalHeader, refreshGlobalHeaderBadge } from '../shell.js'
 import { iconSvg, escapeHtml, detectMediaType, renderMediaEl, timeAgo } from '../utils.js'
 import { loadFeedPosts, getVisiblePostIds, loadPostInteractions, loadMoodTags, loadUsernameMap, insertPost } from '../services/posts.service.js'
 import { toggleLike, addRepost, removeRepost, getOrCreateRepostsBoardId, loadComments, insertComment, getLikeCount, acceptFollowRequest, rejectFollowRequest } from '../services/interactions.service.js'
@@ -24,35 +24,21 @@ let searchTimeout = null
 export async function showFeed(profile, ctx) {
   const { navigate, openComposer } = ctx
   applyNavPref()
+  document.body.classList.add('has-global-header')
+  document.body.classList.remove('profile-page')
 
   document.querySelector('#app').innerHTML = `
     <div class="app-shell">
       ${shellHtml('home', profile)}
       <main class="app-main">
-        <header class="topbar">
-          <span style="font-size:16px;font-weight:600;letter-spacing:.02em;cursor:pointer;flex-shrink:0;" id="logo">Marvin's Place</span>
-          <div class="topbar-search">
-            <span class="topbar-search-icon">${iconSvg('search', 16)}</span>
-            <input id="search-input" class="input" type="text" placeholder="User suchen..." />
-            <div id="search-dropdown" style="display:none;position:absolute;top:calc(100% + 6px);left:0;right:0;background:var(--panel);border:1px solid var(--border);border-radius:var(--radius-md);overflow:hidden;z-index:50;box-shadow:var(--shadow-elev);"></div>
+        <!-- Notif Dropdown (global, außerhalb topbar) -->
+        <div id="notif-dropdown" style="display:none;position:fixed;right:12px;top:60px;width:320px;background:var(--panel);border:1px solid var(--border);border-radius:var(--radius-md);overflow:hidden;z-index:110;box-shadow:var(--shadow-elev);backdrop-filter:blur(24px);">
+          <div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;">
+            <span style="font-size:13px;font-weight:600;color:#fff;">Benachrichtigungen</span>
+            <button id="notif-mark-read" style="background:none;border:none;cursor:pointer;font-size:11px;color:var(--text-mute);">Alle gelesen</button>
           </div>
-          <div class="topbar-actions">
-            <div style="position:relative;">
-              <button id="notif-btn" class="icon-btn" aria-label="Benachrichtigungen">
-                ${iconSvg('bell', 18)}
-                <span id="notif-badge" style="display:none;position:absolute;top:-2px;right:-2px;background:var(--danger);color:#fff;font-size:9px;font-weight:700;border-radius:50%;min-width:16px;height:16px;padding:0 4px;align-items:center;justify-content:center;line-height:1;"></span>
-              </button>
-              <div id="notif-dropdown" style="display:none;position:absolute;right:0;top:calc(100% + 8px);width:320px;background:var(--panel);border:1px solid var(--border);border-radius:var(--radius-md);overflow:hidden;z-index:50;box-shadow:var(--shadow-elev);backdrop-filter:blur(24px);">
-                <div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;">
-                  <span style="font-size:13px;font-weight:600;color:#fff;">Benachrichtigungen</span>
-                  <button id="notif-mark-read" style="background:none;border:none;cursor:pointer;font-size:11px;color:var(--text-mute);">Alle gelesen</button>
-                </div>
-                <div id="notif-list" style="max-height:340px;overflow-y:auto;"></div>
-              </div>
-            </div>
-          </div>
-        </header>
-        <span id="header-username" data-username="${profile.username}" class="hidden">@${profile.username}</span>
+          <div id="notif-list" style="max-height:340px;overflow-y:auto;"></div>
+        </div>
 
         <div id="story-bar" style="display:flex;gap:12px;padding:14px 16px;overflow-x:auto;border-bottom:1px solid var(--border);scrollbar-width:none;-webkit-overflow-scrolling:touch;"></div>
 
@@ -80,6 +66,18 @@ export async function showFeed(profile, ctx) {
       </div>
     </div>`
 
+  // Globaler Header rendern
+  const ghEl = renderGlobalHeader(profile, {
+    navigate,
+    openComposer: (p) => openComposer(p),
+    toggleNotif: (p) => _toggleNotifPanel(p),
+  }, {
+    tone: 'auto',
+    showSearch: true,
+    showNotif: true,
+    showCompose: true,
+  })
+
   loadStoryBar(profile.id)
   wireShellNav(profile, {
     navigate,
@@ -87,8 +85,7 @@ export async function showFeed(profile, ctx) {
     toggleNotif: (p) => _toggleNotifPanel(p),
   })
 
-  document.querySelector('#logo').addEventListener('click', () => navigate('/'))
-  _setupSearch(profile.id, navigate)
+  _setupGlobalSearch(profile.id, navigate)
   _setupNotifications(profile.id, ctx)
 
   document.querySelector('#modal-close').addEventListener('click', _closeCommentsModal)
@@ -96,9 +93,10 @@ export async function showFeed(profile, ctx) {
     if (e.target === document.querySelector('#comments-modal')) _closeCommentsModal()
   })
   document.addEventListener('click', e => {
-    const nb = document.querySelector('#notif-btn'), nd = document.querySelector('#notif-dropdown')
-    if (nb && nd && !nb.contains(e.target) && !nd.contains(e.target)) nd.style.display = 'none'
-    const si = document.querySelector('#search-input'), sd = document.querySelector('#search-dropdown')
+    const ghNotif = document.querySelector('#gh-notif')
+    const nd = document.querySelector('#notif-dropdown')
+    if (ghNotif && nd && !ghNotif.contains(e.target) && !nd.contains(e.target)) nd.style.display = 'none'
+    const si = document.querySelector('#gh-search-input'), sd = document.querySelector('#gh-search-dropdown')
     if (si && sd && !si.contains(e.target) && !sd.contains(e.target)) sd.style.display = 'none'
   })
 
@@ -783,13 +781,14 @@ export function openRepostModal(boards, onConfirm) {
 // ─── Notifications (feed-local) ───────────────────────────────────────────────
 
 function _setupNotifications(currentUserId, ctx) {
-  const btn = document.querySelector('#notif-btn')
+  // Globaler Header Notif-Button
+  const ghNotif = document.querySelector('#gh-notif')
   const dropdown = document.querySelector('#notif-dropdown')
-  if (!btn || !dropdown) return
+  if (!dropdown) return
 
   _refreshNotifBadge(currentUserId)
 
-  btn.addEventListener('click', async e => {
+  ghNotif?.addEventListener('click', async e => {
     e.stopPropagation()
     const isOpen = dropdown.style.display === 'block'
     dropdown.style.display = isOpen ? 'none' : 'block'
@@ -812,11 +811,9 @@ function _setupNotifications(currentUserId, ctx) {
 
 async function _refreshNotifBadge(currentUserId) {
   const count = await getUnreadCount(currentUserId)
-  const badge = document.querySelector('#notif-badge')
-  if (badge) {
-    if (count > 0) { badge.textContent = count > 9 ? '9+' : count; badge.style.display = 'flex' }
-    else { badge.style.display = 'none' }
-  }
+  // Globaler Header Badge
+  refreshGlobalHeaderBadge(count)
+  // Sidebar/Bottombar Badge
   refreshUnreadBadge(count)
 }
 
@@ -900,30 +897,28 @@ function _toggleNotifPanel(profile) {
   if (dd) {
     dd.style.display = dd.style.display === 'block' ? 'none' : 'block'
     if (dd.style.display === 'block') _renderNotifications(profile.id)
-    return
   }
-  // Falls kein Dropdown vorhanden (andere Seite), zur Feed-Seite navigieren
 }
 
-// ─── Search ───────────────────────────────────────────────────────────────────
+// ─── Search (Global Header) ───────────────────────────────────────────────────
 
-function _setupSearch(currentUserId, navigate) {
-  const input = document.querySelector('#search-input')
-  const dropdown = document.querySelector('#search-dropdown')
+function _setupGlobalSearch(currentUserId, navigate) {
+  const input = document.querySelector('#gh-search-input')
+  const dropdown = document.querySelector('#gh-search-dropdown')
   if (!input || !dropdown) return
   input.addEventListener('input', () => {
     clearTimeout(searchTimeout)
     const q = input.value.trim()
     if (!q) { dropdown.style.display = 'none'; return }
-    searchTimeout = setTimeout(() => _runSearch(q, currentUserId, navigate), 250)
+    searchTimeout = setTimeout(() => _runGlobalSearch(q, currentUserId, navigate), 250)
   })
   input.addEventListener('focus', () => {
-    if (input.value.trim()) _runSearch(input.value.trim(), currentUserId, navigate)
+    if (input.value.trim()) _runGlobalSearch(input.value.trim(), currentUserId, navigate)
   })
 }
 
-async function _runSearch(query, currentUserId, navigate) {
-  const dropdown = document.querySelector('#search-dropdown')
+async function _runGlobalSearch(query, currentUserId, navigate) {
+  const dropdown = document.querySelector('#gh-search-dropdown')
   if (!dropdown) return
   dropdown.style.display = 'block'
   dropdown.innerHTML = `<p style="padding:12px 16px;color:#444;font-size:13px;">Suche...</p>`
@@ -938,7 +933,7 @@ async function _runSearch(query, currentUserId, navigate) {
   dropdown.querySelectorAll('.search-result').forEach(el => {
     el.addEventListener('click', () => {
       dropdown.style.display = 'none'
-      document.querySelector('#search-input').value = ''
+      document.querySelector('#gh-search-input').value = ''
       navigate('/u/' + el.dataset.username)
     })
   })

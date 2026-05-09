@@ -9,7 +9,8 @@ import { getBoardsByUser, getProfileReposts, getUserRepostIds, createBoard, upda
 import { loadProfileStories, getViewedStoryIds } from '../services/stories.service.js'
 import { renderBoardPost, wireBoardRepostButtons, wireBoardVideos, loadBoardContent } from './board.page.js'
 import { openStoryViewer, openRepostModal } from './feed.page.js'
-import { escapeHtml, shuffleArray, buildHeaderStyle, buildPatternStyle, buildMusicEmbed, iconSvg } from '../utils.js'
+import { escapeHtml, shuffleArray, buildHeaderStyle, buildPatternStyle, buildMusicEmbed, iconSvg, profileHeaderTone } from '../utils.js'
+import { renderGlobalHeader, setGlobalHeaderTone, registerHeaderScrollListener } from '../shell.js'
 
 /**
  * Zeigt eine Profilseite.
@@ -19,6 +20,10 @@ import { escapeHtml, shuffleArray, buildHeaderStyle, buildPatternStyle, buildMus
 export async function showProfilePage(username, ctx) {
   const { navigate } = ctx
   const app = document.querySelector('#app')
+
+  // Body-Klassen für globalen Header
+  document.body.classList.add('has-global-header', 'profile-page')
+
   app.innerHTML = `<div style="background:#0a0a0a;min-height:100vh;display:flex;align-items:center;justify-content:center;color:#444;font-size:14px;">Lädt...</div>`
 
   const session = await getSession()
@@ -103,45 +108,58 @@ export async function showProfilePage(username, ctx) {
     ? boardPosts.filter(p => p.mood === profile.pinned_board_mood)
     : shuffleArray(boardPosts)
 
+  // Tone für globalen Header bestimmen
+  const tone = profileHeaderTone(profile)
+
   const headerStyle = buildHeaderStyle(profile)
+
+  // Textfarbe im Hero abhängig vom Tone
+  const heroTextColor = tone === 'light' ? 'rgba(0,0,0,0.85)' : '#fff'
+  const heroTextShadow = tone === 'light' ? '0 1px 4px rgba(255,255,255,0.4)' : '0 2px 8px rgba(0,0,0,0.8)'
+  const heroBioColor = tone === 'light' ? 'rgba(0,0,0,0.65)' : 'rgba(255,255,255,0.85)'
+  const heroPrivacyColor = tone === 'light' ? 'rgba(0,0,0,0.4)' : 'rgba(255,255,255,0.5)'
+  const heroBtnBg = tone === 'light' ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.5)'
+  const heroBtnColor = tone === 'light' ? '#111' : '#fff'
+  const heroBtnBorder = tone === 'light' ? 'rgba(0,0,0,0.15)' : 'rgba(255,255,255,0.2)'
 
   app.innerHTML = `
     <div style="background:#0a0a0a;min-height:100vh;color:#fff;">
 
-      <!-- Header -->
-      <div style="position:relative;width:100%;height:260px;overflow:hidden;${headerStyle}">
+      <!-- Hero Header (kein padding-top — globaler Header überlagert) -->
+      <div style="position:relative;width:100%;height:300px;overflow:hidden;${headerStyle}">
         ${profile.header_type === 'image' && profile.header_image_url
           ? `<img src="${profile.header_image_url}" alt="" style="position:absolute;width:100%;height:100%;object-fit:cover;transform:translate(${(profile.header_image_position?.x || 50) - 50}%, ${(profile.header_image_position?.y || 50) - 50}%) scale(${profile.header_image_position?.zoom || 1});transform-origin:center;" />`
           : ''}
         ${profile.header_type === 'pattern'
           ? `<div style="position:absolute;inset:0;${buildPatternStyle(profile.header_pattern)}opacity:0.25;"></div>`
           : ''}
-        <div style="position:absolute;top:20px;left:20px;z-index:2;max-width:65%;display:flex;align-items:flex-start;gap:12px;">
+        <!-- Gradient-Overlay unten für sanften Übergang -->
+        <div style="position:absolute;bottom:0;left:0;right:0;height:120px;background:linear-gradient(to bottom,transparent,#0a0a0a);pointer-events:none;z-index:1;"></div>
+        <div style="position:absolute;top:64px;left:20px;z-index:2;max-width:65%;display:flex;align-items:flex-start;gap:12px;">
           ${hasStories ? `
-            <div id="profile-story-ring" style="width:48px;height:48px;border-radius:50%;padding:2px;background:${hasUnseenStories ? 'linear-gradient(135deg,#ff4d6d,#ffd60a,#06d6a0)' : 'rgba(255,255,255,0.4)'};cursor:pointer;flex-shrink:0;">
-              <div style="width:100%;height:100%;border-radius:50%;background:#1a1a1a;display:flex;align-items:center;justify-content:center;font-size:18px;color:#fff;border:2px solid #0a0a0a;">${(profile.username || '?')[0].toUpperCase()}</div>
+            <div id="profile-story-ring" style="width:52px;height:52px;border-radius:50%;padding:2px;background:${hasUnseenStories ? 'linear-gradient(135deg,#ff4d6d,#ffd60a,#06d6a0)' : 'rgba(255,255,255,0.4)'};cursor:pointer;flex-shrink:0;">
+              <div style="width:100%;height:100%;border-radius:50%;background:#1a1a1a;display:flex;align-items:center;justify-content:center;font-size:20px;color:#fff;border:2px solid #0a0a0a;">${(profile.username || '?')[0].toUpperCase()}</div>
             </div>` : ''}
           <div style="min-width:0;">
-            <div style="font-size:22px;font-weight:700;color:#fff;text-shadow:0 2px 8px rgba(0,0,0,0.8);">${escapeHtml(profile.display_name || profile.username)}</div>
-            ${profile.bio ? `<div style="font-size:13px;color:rgba(255,255,255,0.85);margin-top:6px;line-height:1.4;text-shadow:0 1px 4px rgba(0,0,0,0.7);">${escapeHtml(profile.bio)}</div>` : ''}
-            ${profilePrivacy !== 'public' ? `<div style="margin-top:8px;font-size:11px;color:rgba(255,255,255,0.5);">${profilePrivacy === 'private' ? '🔒 Privates Profil' : '👥 Nur Follower'}</div>` : ''}
+            <div style="font-size:22px;font-weight:700;color:${heroTextColor};text-shadow:${heroTextShadow};">${escapeHtml(profile.display_name || profile.username)}</div>
+            ${profile.bio ? `<div style="font-size:13px;color:${heroBioColor};margin-top:6px;line-height:1.4;text-shadow:${heroTextShadow};">${escapeHtml(profile.bio)}</div>` : ''}
+            ${profilePrivacy !== 'public' ? `<div style="margin-top:8px;font-size:11px;color:${heroPrivacyColor};">${profilePrivacy === 'private' ? '🔒 Privates Profil' : '👥 Nur Follower'}</div>` : ''}
           </div>
         </div>
-        <div style="position:absolute;top:14px;right:14px;z-index:2;display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;max-width:60%;">
-          <button id="btn-back" class="icon-btn icon-btn-sm" aria-label="Zurück" style="background:rgba(0,0,0,0.5);">${iconSvg('chevL', 14)}</button>
+        <div style="position:absolute;top:60px;right:14px;z-index:2;display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;max-width:60%;">
           ${isOwner
-            ? `<button id="btn-edit" class="icon-btn icon-btn-sm" aria-label="Profil bearbeiten" style="background:rgba(255,255,255,.15);">${iconSvg('edit', 14)}</button>
-               <button id="btn-settings-link" class="icon-btn icon-btn-sm" aria-label="Einstellungen" style="background:rgba(0,0,0,0.5);">${iconSvg('settings', 14)}</button>`
+            ? `<button id="btn-edit" class="icon-btn icon-btn-sm" aria-label="Profil bearbeiten" style="background:${heroBtnBg};color:${heroBtnColor};border-color:${heroBtnBorder};">${iconSvg('edit', 14)}</button>
+               <button id="btn-settings-link" class="icon-btn icon-btn-sm" aria-label="Einstellungen" style="background:${heroBtnBg};color:${heroBtnColor};border-color:${heroBtnBorder};">${iconSvg('settings', 14)}</button>`
             : currentUserId ? `
               ${!iBlocked ? `<button id="btn-follow" data-state="${followState}" style="padding:6px 14px;background:${followState === 'accepted' ? 'transparent' : followState === 'pending' ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.9)'};color:${followState === 'accepted' ? '#fff' : followState === 'pending' ? '#888' : '#000'};border:1px solid ${followState === 'pending' ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.4)'};border-radius:8px;cursor:pointer;font-size:12px;font-weight:500;">${followState === 'accepted' ? 'Folgst du' : followState === 'pending' ? 'Angefragt' : 'Folgen'}</button>` : ''}
-              <button id="btn-block" class="icon-btn icon-btn-sm" aria-label="${iBlocked ? 'Entblocken' : 'Blockieren'}" style="background:rgba(0,0,0,0.5);${iBlocked ? 'color:var(--danger);' : ''}">${iconSvg('ban', 14)}</button>
+              <button id="btn-block" class="icon-btn icon-btn-sm" aria-label="${iBlocked ? 'Entblocken' : 'Blockieren'}" style="background:${heroBtnBg};color:${iBlocked ? 'var(--danger)' : heroBtnColor};border-color:${heroBtnBorder};">${iconSvg('ban', 14)}</button>
             ` : ''
           }
         </div>
-        <button id="btn-info" style="position:absolute;bottom:16px;left:16px;z-index:2;padding:6px 14px;background:rgba(0,0,0,0.5);color:#fff;border:1px solid rgba(255,255,255,0.2);border-radius:20px;cursor:pointer;font-size:12px;backdrop-filter:blur(8px);">
+        <button id="btn-info" style="position:absolute;bottom:20px;left:16px;z-index:2;padding:6px 14px;background:${heroBtnBg};color:${heroBtnColor};border:1px solid ${heroBtnBorder};border-radius:20px;cursor:pointer;font-size:12px;backdrop-filter:blur(8px);">
           @${profile.username} · ${boardPosts.length} Posts · ${followerCount} Follower
         </button>
-        ${profile.playlist_url ? `<button id="btn-music" style="position:absolute;bottom:16px;right:16px;z-index:2;width:42px;height:42px;background:rgba(0,0,0,0.5);border:1px solid rgba(255,255,255,0.2);border-radius:50%;cursor:pointer;font-size:20px;backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;">🎵</button>` : ''}
+        ${profile.playlist_url ? `<button id="btn-music" style="position:absolute;bottom:20px;right:16px;z-index:2;width:42px;height:42px;background:${heroBtnBg};color:${heroBtnColor};border:1px solid ${heroBtnBorder};border-radius:50%;cursor:pointer;font-size:20px;backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;">🎵</button>` : ''}
       </div>
 
       <!-- Info Panel -->
@@ -296,8 +314,29 @@ export async function showProfilePage(username, ctx) {
       </div>
     </div>`
 
+  // ── Globaler Header (Profil-Modus) ───────────────────────────────────────────
+  renderGlobalHeader(profile, { navigate }, {
+    tone,
+    showBack: true,
+  })
+
+  // Scroll-Listener: Header-Tone dynamisch anpassen
+  // Wenn der Hero-Bereich verlassen wird → 'auto' (Standard-Glasmorphismus)
+  const heroEl = app.querySelector('div[style*="height:300px"]')
+  const _onProfileScroll = () => {
+    const heroBottom = heroEl ? heroEl.getBoundingClientRect().bottom : 0
+    if (heroBottom <= 52) {
+      setGlobalHeaderTone('auto')
+    } else {
+      setGlobalHeaderTone(tone)
+    }
+  }
+  // Registriert und entfernt automatisch beim nächsten Seitenwechsel
+  registerHeaderScrollListener(_onProfileScroll)
+  // Initial setzen
+  setGlobalHeaderTone(tone)
+
   // ── Basic Listeners ──────────────────────────────────────────────────────────
-  document.querySelector('#btn-back').addEventListener('click', () => navigate('/'))
   document.querySelector('#btn-settings-link')?.addEventListener('click', () => navigate('/settings'))
   document.querySelector('#btn-info').addEventListener('click', () => {
     const p = document.querySelector('#info-panel')

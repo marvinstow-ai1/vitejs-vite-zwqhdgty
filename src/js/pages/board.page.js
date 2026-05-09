@@ -4,6 +4,7 @@ import { getBoardPosts, getBoardsByUser, addPostToBoard, deleteBoard, getUserRep
 import { getVisiblePostIds } from '../services/posts.service.js'
 import { escapeHtml, detectMediaType, getYouTubeEmbedUrl, buildMusicEmbed } from '../utils.js'
 import { addRepost, removeRepost } from '../services/interactions.service.js'
+import { renderGlobalHeader } from '../shell.js'
 
 // ── Grid-CSS (einmalig injizieren) ────────────────────────────────────────────
 const BOARD_GRID_CSS = `
@@ -211,6 +212,9 @@ export async function loadBoardContent(boardId, container, isOwner, currentUserI
  */
 export async function showBoardPage(username, boardId, { navigate, openRepostModal }) {
   const app = document.querySelector('#app')
+  document.body.classList.add('has-global-header')
+  document.body.classList.remove('profile-page')
+
   app.innerHTML = `<div style="background:#0a0a0a;min-height:100vh;display:flex;align-items:center;justify-content:center;color:#444;">Lädt...</div>`
 
   const session = await getSession()
@@ -234,14 +238,15 @@ export async function showBoardPage(username, boardId, { navigate, openRepostMod
 
   app.innerHTML = `
     <div style="background:#0a0a0a;min-height:100vh;color:#fff;padding-bottom:40px;">
-      <div style="padding:16px;border-bottom:1px solid #1a1a1a;display:flex;align-items:center;gap:12px;">
-        <button id="board-back" style="background:none;border:none;color:#555;cursor:pointer;font-size:20px;line-height:1;">←</button>
-        <span style="color:#fff;font-size:15px;font-weight:500;">${escapeHtml(board.title)}</span>
-      </div>
       <div id="board-standalone"></div>
     </div>`
 
-  document.querySelector('#board-back').addEventListener('click', () => history.back())
+  // Globaler Header mit Back-Button und Board-Titel
+  renderGlobalHeader(profile, { navigate }, {
+    tone: 'auto',
+    title: escapeHtml(board.title),
+    showBack: true,
+  })
 
   const boards = await getBoardsByUser(profile.id)
   await loadBoardContent(

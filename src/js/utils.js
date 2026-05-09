@@ -94,6 +94,42 @@ export function buildHeaderStyle(profile) {
   return `background:${profile.header_color || '#0a0a0a'};`
 }
 
+/**
+ * Berechnet die relative Luminanz einer Hex-Farbe (0 = schwarz, 1 = weiß).
+ * @param {string} hex — z.B. '#ffd6e0' oder '#0a0a0a'
+ * @returns {number} 0–1
+ */
+export function hexLuminance(hex) {
+  const clean = hex.replace('#', '')
+  if (clean.length !== 6) return 0
+  const r = parseInt(clean.slice(0, 2), 16) / 255
+  const g = parseInt(clean.slice(2, 4), 16) / 255
+  const b = parseInt(clean.slice(4, 6), 16) / 255
+  const toLinear = c => c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4)
+  return 0.2126 * toLinear(r) + 0.7152 * toLinear(g) + 0.0722 * toLinear(b)
+}
+
+/**
+ * Gibt 'light' zurück wenn der Hintergrund hell ist, sonst 'dark'.
+ * Schwellwert 0.35 — etwas tiefer als 0.5 weil dunkle Farben dominieren.
+ * @param {string} hex
+ * @returns {'light'|'dark'}
+ */
+export function bgTone(hex) {
+  return hexLuminance(hex) > 0.35 ? 'light' : 'dark'
+}
+
+/**
+ * Ermittelt den dominanten Ton eines Profil-Headers.
+ * Bei Bildern: nimmt die header_color als Fallback.
+ * @param {object} profile
+ * @returns {'light'|'dark'}
+ */
+export function profileHeaderTone(profile) {
+  const color = profile.header_color || '#0a0a0a'
+  return bgTone(color)
+}
+
 export function buildPatternStyle(pattern) {
   const p = {
     dots: 'background-image:radial-gradient(circle,#fff 1px,transparent 1px);background-size:16px 16px;',

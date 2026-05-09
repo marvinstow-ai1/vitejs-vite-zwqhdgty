@@ -1,5 +1,5 @@
 import { supabase } from '../supabase.js'
-import { shellHtml, wireShellNav, applyNavPref, getNavPref, setNavPref, refreshUnreadBadge } from '../shell.js'
+import { shellHtml, wireShellNav, applyNavPref, getNavPref, setNavPref, refreshUnreadBadge, renderGlobalHeader, refreshGlobalHeaderBadge } from '../shell.js'
 import { iconSvg, escapeHtml } from '../utils.js'
 import { getUnreadCount } from '../services/notifications.service.js'
 import { updateProfile, getMyBlocks } from '../services/profiles.service.js'
@@ -15,6 +15,8 @@ import { unblockUser } from '../services/interactions.service.js'
 export async function showSettingsPage(profile, session, ctx) {
   const { navigate, openComposer, toggleNotif } = ctx
   applyNavPref()
+  document.body.classList.add('has-global-header')
+  document.body.classList.remove('profile-page')
 
   const navPref = getNavPref()
   const profilePrivacy = profile.profile_privacy || 'public'
@@ -23,11 +25,6 @@ export async function showSettingsPage(profile, session, ctx) {
     <div class="app-shell">
       ${shellHtml('settings', profile)}
       <main class="app-main">
-        <header class="topbar">
-          <button class="icon-btn icon-btn-sm" id="set-back" aria-label="Zurück">${iconSvg('chevL', 16)}</button>
-          <span style="font-size:16px;font-weight:600;">Einstellungen</span>
-        </header>
-
         <div class="settings-wrap">
 
           <section class="settings-section">
@@ -124,10 +121,21 @@ export async function showSettingsPage(profile, session, ctx) {
     <div id="blocks-host"></div>
   `
 
-  wireShellNav(profile, { navigate, openComposer, toggleNotif })
-  getUnreadCount(profile.id).then(count => refreshUnreadBadge(count)).catch(() => {})
+  // Globaler Header
+  renderGlobalHeader(profile, { navigate, openComposer, toggleNotif }, {
+    tone: 'auto',
+    title: 'Einstellungen',
+    showBack: true,
+  })
+  document.querySelector('#gh-back')?.addEventListener('click', () => navigate('/'))
 
-  document.querySelector('#set-back').onclick = () => navigate('/')
+  wireShellNav(profile, { navigate, openComposer, toggleNotif })
+
+  getUnreadCount(profile.id).then(c => {
+    refreshUnreadBadge(c)
+    refreshGlobalHeaderBadge(c)
+  }).catch(() => {})
+
   document.querySelector('#set-edit-profile').onclick = () => navigate('/u/' + profile.username + '?edit=1')
 
   // Privacy
