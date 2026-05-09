@@ -14,6 +14,38 @@ let exploreLoading = false
 let exploreHasMore = true
 const EXPLORE_LIMIT = 30
 
+// ─── CSS (einmalig injizieren) ────────────────────────────────────────────────
+const EXPLORE_GRID_CSS = `
+#explore-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:2px;padding:2px;}
+.explore-card{position:relative;overflow:hidden;background:#111;aspect-ratio:9/16;cursor:pointer;contain:strict;}
+.explore-card img,.explore-card video{width:100%;height:100%;object-fit:cover;display:block;transition:transform .3s;}
+.explore-card:hover img,.explore-card:hover video{transform:scale(1.04);}
+.explore-mute-btn{position:absolute;bottom:6px;right:6px;z-index:4;width:26px;height:26px;border-radius:50%;border:none;background:rgba(0,0,0,0.45);color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:12px;line-height:1;backdrop-filter:blur(4px);padding:0;}
+.explore-mute-btn:hover{background:rgba(0,0,0,0.7);}
+`
+let _exploreCssInjected = false
+function _injectExploreCss() {
+  if (_exploreCssInjected) return
+  _exploreCssInjected = true
+  const s = document.createElement('style')
+  s.textContent = EXPLORE_GRID_CSS
+  document.head.appendChild(s)
+}
+
+// ─── IntersectionObserver für Video-Autoplay ──────────────────────────────────
+let _exploreObserver = null
+function _getExploreObserver() {
+  if (_exploreObserver) return _exploreObserver
+  _exploreObserver = new IntersectionObserver(entries => {
+    entries.forEach(e => {
+      const v = e.target
+      if (e.isIntersecting) { v.muted = true; v.play().catch(() => {}) }
+      else { v.pause(); v.currentTime = 0 }
+    })
+  }, { threshold: 0.25, rootMargin: '100px' })
+  return _exploreObserver
+}
+
 // ─── Explore Page ─────────────────────────────────────────────────────────────
 
 /**
@@ -28,6 +60,8 @@ export async function showExplorePage(profile, nav) {
   exploreCursor = null
   exploreLoading = false
   exploreHasMore = true
+
+  _injectExploreCss()
 
   document.querySelector('#app').innerHTML = `
     <div class="app-shell">
@@ -45,8 +79,8 @@ export async function showExplorePage(profile, nav) {
         <!-- Suggested Users -->
         <div id="explore-suggestions" style="display:none;padding:14px 14px 0;"></div>
 
-        <!-- Post Grid -->
-        <div id="explore-grid" style="columns:3 100px;gap:3px;padding:3px;"></div>
+        <!-- Post Grid (CSS-Grid via injected style) -->
+        <div id="explore-grid"></div>
 
         <!-- Load More -->
         <div id="explore-more" style="display:none;padding:20px;text-align:center;">
@@ -150,7 +184,7 @@ async function _loadExploreGrid(profile, nav, reset) {
   if (!grid) { exploreLoading = false; return }
 
   if (reset) {
-    grid.innerHTML = `<div style="grid-column:1/-1;color:#444;font-size:12px;text-align:center;padding:24px;">Lädt…</div>`
+    grid.innerHTML = `<div style="color:#444;font-size:12px;text-align:center;padding:24px;grid-column:1/-1;">Lädt…</div>`
     state.style.display = 'none'
     if (moreBtn) moreBtn.style.display = 'none'
     exploreCursor = null
@@ -210,15 +244,30 @@ function _renderExploreCard(post, currentUserId, usernameMap, interactions) {
   const rc = repostCounts[post.id] || 0
   const username = usernameMap[post.user_id] || 'unknown'
   const mt = post.media_type || detectMediaType(post.media_url)
+  const isVideo = mt === 'video' || mt === 'gif'
   const isEmbed = mt === 'youtube' || mt === 'instagram'
 
+  // Medien-Element: Videos bekommen autoplay/muted/loop/playsinline + preload=none
+  let mediaHtml
+  if (isVideo) {
+    mediaHtml = `<video src="${escapeHtml(post.media_url || '')}" muted loop playsinline preload="none" style="width:100%;height:100%;object-fit:cover;display:block;"></video>`
+  } else if (isEmbed) {
+    mediaHtml = renderMediaEl(post.media_url, mt, { borderRadius: '0' })
+  } else {
+    mediaHtml = `<img src="${escapeHtml(post.media_url || '')}" alt="" loading="lazy" style="width:100%;height:100%;object-fit:cover;display:block;" onerror="this.style.display='none'">`
+  }
+
+  const muteBtn = isVideo
+    ? `<button class="explore-mute-btn" data-muted="1" title="Ton umschalten">🔇</button>`
+    : ''
+
   return `
-    <div class="explore-card" data-post-id="${post.id}" style="break-inside:avoid;margin-bottom:3px;position:relative;background:#111;border-radius:4px;overflow:hidden;cursor:pointer;">
-      <div class="explore-media" data-post-id="${post.id}" data-media-url="${escapeHtml(post.media_url || '')}" data-media-type="${mt}" data-owner-id="${post.user_id}" style="position:relative;">
-        ${renderMediaEl(post.media_url, mt, { borderRadius: '0' })}
+    <div class="explore-card" data-post-id="${post.id}">
+      <div class="explore-media" data-post-id="${post.id}" data-media-url="${escapeHtml(post.media_url || '')}" data-media-type="${mt}" data-owner-id="${post.user_id}" style="position:absolute;inset:0;">
+        ${mediaHtml}
       </div>
       <!-- Hover Overlay -->
-      <div class="explore-overlay" style="position:absolute;inset:0;background:rgba(0,0,0,0);display:flex;flex-direction:column;justify-content:flex-end;padding:8px;opacity:0;transition:opacity .18s;pointer-events:none;">
+      <div class="explore-overlay" style="position:absolute;inset:0;background:rgba(0,0,0,0);display:flex;flex-direction:column;justify-content:flex-end;padding:8px;opacity:0;transition:opacity .18s;pointer-events:none;z-index:2;">
         <div style="display:flex;align-items:center;justify-content:space-between;">
           <span class="explore-username" data-username="${username}" style="font-size:11px;color:rgba(255,255,255,0.85);pointer-events:all;cursor:pointer;max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">@${username}</span>
           <div style="display:flex;gap:6px;align-items:center;">
@@ -229,7 +278,7 @@ function _renderExploreCard(post, currentUserId, usernameMap, interactions) {
         ${post.mood ? `<span class="explore-mood-tag" data-mood="${post.mood}" style="font-size:10px;color:rgba(255,255,255,0.5);margin-top:3px;pointer-events:all;cursor:pointer;">#${post.mood}</span>` : ''}
       </div>
       <!-- Action Bar (immer sichtbar auf Mobile) -->
-      <div class="explore-actions" style="display:flex;align-items:center;gap:2px;padding:4px 6px;background:rgba(0,0,0,0.6);">
+      <div class="explore-actions" style="position:absolute;bottom:0;left:0;right:0;z-index:3;display:flex;align-items:center;gap:2px;padding:4px 6px;background:rgba(0,0,0,0.6);">
         <button class="explore-like-btn" data-post-id="${post.id}" data-liked="${liked}" data-owner-id="${post.user_id}" style="display:flex;align-items:center;gap:2px;background:none;border:none;cursor:pointer;color:${liked ? '#ff4d6d' : '#888'};font-size:11px;padding:3px 4px;border-radius:4px;flex:1;justify-content:center;">
           <span class="explore-like-icon" style="font-size:13px;">${liked ? '♥' : '♡'}</span>
           <span class="explore-like-count" data-post-id="${post.id}">${lc}</span>
@@ -243,23 +292,46 @@ function _renderExploreCard(post, currentUserId, usernameMap, interactions) {
           <span class="explore-repost-count" data-post-id="${post.id}">${rc}</span>
         </button>
       </div>
+      ${muteBtn}
     </div>`
 }
 
 // ─── Wire Actions ─────────────────────────────────────────────────────────────
 
 function _wireExploreActions(profile, nav) {
-  // Hover-Overlay auf Desktop
+  const obs = _getExploreObserver()
+
+  // Hover-Overlay auf Desktop + Video-Autoplay via IntersectionObserver
   document.querySelectorAll('#explore-grid .explore-card').forEach(card => {
     const overlay = card.querySelector('.explore-overlay')
-    if (!overlay) return
-    card.addEventListener('mouseenter', () => {
-      overlay.style.opacity = '1'
-      overlay.style.background = 'rgba(0,0,0,0.45)'
-    })
-    card.addEventListener('mouseleave', () => {
-      overlay.style.opacity = '0'
-      overlay.style.background = 'rgba(0,0,0,0)'
+    if (overlay) {
+      card.addEventListener('mouseenter', () => {
+        overlay.style.opacity = '1'
+        overlay.style.background = 'rgba(0,0,0,0.45)'
+      })
+      card.addEventListener('mouseleave', () => {
+        overlay.style.opacity = '0'
+        overlay.style.background = 'rgba(0,0,0,0)'
+      })
+    }
+    // Video-Autoplay beobachten
+    const v = card.querySelector('video')
+    if (v) obs.observe(v)
+  })
+
+  // Mute-Buttons verdrahten
+  document.querySelectorAll('#explore-grid .explore-mute-btn').forEach(btn => {
+    if (btn.dataset.wired === '1') return
+    btn.dataset.wired = '1'
+    btn.addEventListener('click', e => {
+      e.stopPropagation()
+      const card = btn.closest('.explore-card')
+      const v = card?.querySelector('video')
+      if (!v) return
+      const nowMuted = btn.dataset.muted === '1'
+      v.muted = !nowMuted
+      btn.dataset.muted = nowMuted ? '0' : '1'
+      btn.textContent = nowMuted ? '🔊' : '🔇'
     })
   })
 

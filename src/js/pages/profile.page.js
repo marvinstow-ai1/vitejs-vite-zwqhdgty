@@ -7,7 +7,7 @@ import { notifyAction } from '../services/notify.action.js'
 import { uploadHeaderImage } from '../services/media.service.js'
 import { getBoardsByUser, getProfileReposts, getUserRepostIds, createBoard, updateBoard } from '../services/boards.service.js'
 import { loadProfileStories, getViewedStoryIds } from '../services/stories.service.js'
-import { renderBoardPost, wireBoardRepostButtons, loadBoardContent } from './board.page.js'
+import { renderBoardPost, wireBoardRepostButtons, wireBoardVideos, loadBoardContent } from './board.page.js'
 import { openStoryViewer, openRepostModal } from './feed.page.js'
 import { escapeHtml, shuffleArray, buildHeaderStyle, buildPatternStyle, buildMusicEmbed, iconSvg } from '../utils.js'
 
@@ -184,9 +184,9 @@ export async function showProfilePage(username, ctx) {
 
         <!-- Board Content -->
         <div id="board-content">
-          <div style="columns:3 100px;gap:3px;padding:3px;">
+          <div class="board-grid">
             ${shuffled.map(post => renderBoardPost(post, isOwner, { viewerId: currentUserId, viewerReposted: viewerRepostedSet.has(post.id) })).join('')}
-            ${!shuffled.length ? `<p style="color:#333;font-size:14px;padding:40px;">Noch keine Posts.</p>` : ''}
+            ${!shuffled.length ? `<p style="color:#333;font-size:14px;padding:40px;grid-column:1/-1;">Noch keine Posts.</p>` : ''}
           </div>
         </div>
       `}
@@ -411,8 +411,9 @@ export async function showProfilePage(username, ctx) {
         const boardId = tab.dataset.board
         const content = document.querySelector('#board-content')
         if (boardId === 'all') {
-          content.innerHTML = `<div style="columns:3 100px;gap:3px;padding:3px;">${shuffled.map(post => renderBoardPost(post, isOwner, { viewerId: currentUserId, viewerReposted: viewerRepostedSet.has(post.id) })).join('') || '<p style="color:#333;font-size:14px;padding:40px;">Noch keine Posts.</p>'}</div>`
+          content.innerHTML = `<div class="board-grid">${shuffled.map(post => renderBoardPost(post, isOwner, { viewerId: currentUserId, viewerReposted: viewerRepostedSet.has(post.id) })).join('') || '<p style="color:#333;font-size:14px;padding:40px;grid-column:1/-1;">Noch keine Posts.</p>'}</div>`
           wireBoardRepostButtons(currentUserId, (bds, cb) => openRepostModal(bds, cb))
+          wireBoardVideos(content)
         } else {
           content.innerHTML = `<p style="padding:24px;color:#444;font-size:13px;">Lädt...</p>`
           await loadBoardContent(boardId, content, isOwner, currentUserId, boards, profile.username, {
@@ -424,6 +425,7 @@ export async function showProfilePage(username, ctx) {
     })
 
     wireBoardRepostButtons(currentUserId, (bds, cb) => openRepostModal(bds, cb))
+    wireBoardVideos(document.querySelector('#board-content'))
 
     document.querySelector('#btn-new-board')?.addEventListener('click', () => _openBoardModal(null, currentUserId, profile.username, navigate))
   }
