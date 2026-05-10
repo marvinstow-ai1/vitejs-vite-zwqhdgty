@@ -976,6 +976,29 @@ input::placeholder, textarea::placeholder { color: rgba(255,255,255,.35); }
   transition: none;
 }
 
+/* ─── Loading Spinner ────────────────────────────────────────── */
+.spinner-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.spinner {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 2px solid rgba(255,255,255,.12);
+  border-top-color: rgba(255,255,255,.55);
+  animation: spin .6s linear infinite;
+}
+.spinner-sm {
+  width: 16px;
+  height: 16px;
+  border-width: 1.5px;
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
 /* Responsive: Mobile */
 @media (max-width: 600px) {
   .filter-popup {

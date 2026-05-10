@@ -171,7 +171,7 @@ export async function loadFeed(profile, navigate) {
   _renderFilterBar(profile, navigate)
 
   state.classList.add('hidden')
-  grid.innerHTML = `<div style="grid-column:1/-1;color:#444;font-size:12px;text-align:center;padding:20px;">Lädt…</div>`
+  grid.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:20px;"><div class="spinner-wrap"><div class="spinner"></div></div></div>`
 
   const { data: allPosts, error } = await loadFeedPosts(profile.id, activeMood)
   if (error) {
@@ -904,7 +904,7 @@ async function _refreshNotifBadge(currentUserId) {
 async function _renderNotifications(currentUserId) {
   const list = document.querySelector('#notif-list')
   if (!list) return
-  list.innerHTML = `<p style="padding:16px;color:#444;font-size:13px;">Lädt...</p>`
+  list.innerHTML = `<div class="spinner-wrap" style="padding:16px;"><div class="spinner"></div></div>`
   const notifs = await loadNotifications(currentUserId)
   if (!notifs.length) { list.innerHTML = `<p style="padding:16px;color:#444;font-size:13px;">Keine Benachrichtigungen.</p>`; return }
   list.innerHTML = notifs.map(n => {

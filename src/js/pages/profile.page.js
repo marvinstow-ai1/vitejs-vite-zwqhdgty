@@ -27,7 +27,7 @@ export async function showProfilePage(username, ctx) {
   applyNavPref()
 
   updateActiveNav('profile')
-  updateShellContent(`<div style="background:#0a0a0a;min-height:100vh;display:flex;align-items:center;justify-content:center;color:#444;font-size:14px;">Lädt...</div>`)
+  updateShellContent(`<div style="background:#0a0a0a;min-height:100vh;display:flex;align-items:center;justify-content:center;"><div class="spinner-wrap"><div class="spinner"></div></div></div>`)
 
   const session = await getSession()
   const currentUserId = session?.user?.id || null
@@ -467,7 +467,7 @@ export async function showProfilePage(username, ctx) {
           initGridCols('#profile-grid')
           renderGridControls(document.querySelector('#profile-grid-controls'), '#profile-grid')
         } else {
-          content.innerHTML = `<p style="padding:24px;color:#444;font-size:13px;">Lädt...</p>`
+          content.innerHTML = `<div class="spinner-wrap" style="padding:24px;"><div class="spinner"></div></div>`
           await loadBoardContent(boardId, content, isOwner, currentUserId, boards, profile.username, {
             navigate,
             openRepostModal: (bds, cb) => openRepostModal(bds, cb),

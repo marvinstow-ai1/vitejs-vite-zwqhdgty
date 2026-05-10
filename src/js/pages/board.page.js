@@ -206,7 +206,7 @@ export async function showBoardPage(username, boardId, { navigate, openRepostMod
   document.body.classList.add('has-global-header')
   document.body.classList.remove('profile-page')
 
-  app.innerHTML = `<div style="background:#0a0a0a;min-height:100vh;display:flex;align-items:center;justify-content:center;color:#444;">Lädt...</div>`
+  app.innerHTML = `<div style="background:#0a0a0a;min-height:100vh;display:flex;align-items:center;justify-content:center;"><div class="spinner-wrap"><div class="spinner"></div></div></div>`
 
   const session = await getSession()
   const currentUserId = session?.user?.id || null

@@ -227,7 +227,7 @@ async function _loadExploreGrid(profile, nav, reset) {
   if (!grid) { exploreLoading = false; return }
 
   if (reset) {
-    grid.innerHTML = `<div style="color:#444;font-size:12px;text-align:center;padding:24px;grid-column:1/-1;">Lädt…</div>`
+    grid.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:24px;"><div class="spinner-wrap"><div class="spinner"></div></div></div>`
     state.style.display = 'none'
     if (moreBtn) moreBtn.style.display = 'none'
     exploreCursor = null
