@@ -1,5 +1,5 @@
 import { supabase } from '../supabase.js'
-import { updateShellContent, updateActiveNav, wireShellNav, applyNavPref, refreshUnreadBadge, renderGlobalHeader, refreshGlobalHeaderBadge } from '../shell.js'
+import { updateShellContent, updateActiveNav, wireShellNav, applyNavPref, refreshUnreadBadge, updateGlobalHeader, refreshGlobalHeaderBadge } from '../shell.js'
 import { iconSvg, escapeHtml, detectMediaType, renderMediaEl, timeAgo } from '../utils.js'
 import { initGridCols } from '../grid-utils.js'
 import { renderGridControls } from '../grid-controls.js'
@@ -100,12 +100,8 @@ export async function showFeed(profile, ctx) {
       </div>
     </div>`)
 
-  // Globaler Header rendern
-  const ghEl = renderGlobalHeader(profile, {
-    navigate,
-    openComposer: (p) => openComposer(p),
-    toggleNotif: (p) => _toggleNotifPanel(p),
-  }, {
+  // Globaler Header updaten (persistent via renderShell)
+  updateGlobalHeader({
     tone: 'auto',
     showSearch: true,
     showNotif: true,
@@ -865,19 +861,11 @@ function _setupNotifications(currentUserId, ctx) {
     _notifChannel = null
   }
 
-  // Globaler Header Notif-Button
-  const ghNotif = document.querySelector('#gh-notif')
+  // Globaler Header Notif-Button wird via wireShellNav → toggleNotif → _toggleNotifPanel verdrahtet
   const dropdown = document.querySelector('#notif-dropdown')
   if (!dropdown) return
 
   _refreshNotifBadge(currentUserId)
-
-  ghNotif?.addEventListener('click', async e => {
-    e.stopPropagation()
-    const isOpen = dropdown.style.display === 'block'
-    dropdown.style.display = isOpen ? 'none' : 'block'
-    if (!isOpen) await _renderNotifications(currentUserId)
-  })
 
   document.querySelector('#notif-mark-read')?.addEventListener('click', async () => {
     await markAllRead(currentUserId)

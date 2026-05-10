@@ -1,5 +1,5 @@
 import { supabase } from '../supabase.js'
-import { updateShellContent, updateActiveNav, wireShellNav, applyNavPref, getNavPref, setNavPref, refreshUnreadBadge, renderGlobalHeader, refreshGlobalHeaderBadge } from '../shell.js'
+import { updateShellContent, updateActiveNav, wireShellNav, applyNavPref, getNavPref, setNavPref, refreshUnreadBadge, updateGlobalHeader, refreshGlobalHeaderBadge } from '../shell.js'
 import { iconSvg, escapeHtml } from '../utils.js'
 import { getUnreadCount } from '../services/notifications.service.js'
 import { updateProfile, getMyBlocks } from '../services/profiles.service.js'
@@ -116,13 +116,12 @@ export async function showSettingsPage(profile, session, ctx) {
 
     <div id="blocks-host"></div>`)
 
-  // Globaler Header
-  renderGlobalHeader(profile, { navigate, openComposer, toggleNotif }, {
+  // Globaler Header updaten (persistent via renderShell)
+  updateGlobalHeader({
     tone: 'auto',
     title: 'Einstellungen',
     showBack: true,
   })
-  document.querySelector('#gh-back')?.addEventListener('click', () => navigate('/'))
 
   wireShellNav(profile, { navigate, openComposer, toggleNotif })
 

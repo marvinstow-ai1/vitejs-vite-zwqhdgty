@@ -21,7 +21,7 @@ export function applyNavPref() {
 let _scrollListener = null
 
 /**
- * Registriert einen Scroll-Listener der beim nächsten renderGlobalHeader-Aufruf
+ * Registriert einen Scroll-Listener der beim nächsten updateGlobalHeader-Aufruf
  * automatisch entfernt wird.
  * @param {function} fn
  */
@@ -34,17 +34,24 @@ export function registerHeaderScrollListener(fn) {
 }
 
 /**
- * Rendert den globalen Header (außerhalb der app-shell, position:fixed).
+ * Aktualisiert den persistenten globalen Header (bereits im DOM via renderShell()).
+ *
  * tone: 'light' | 'dark' | 'auto'
  *   - 'light' → dunkle Schrift (Profil mit hellem Header)
  *   - 'dark'  → helle Schrift, fast transparent (Tunnel-Erlebnis)
  *   - 'auto'  → Standard (Feed, Explore, Settings)
  *
- * @param {object} profile
- * @param {{ navigate: function, openComposer?: function, toggleNotif?: function }} callbacks
- * @param {{ tone?: string, title?: string, showBack?: boolean, showSearch?: boolean, showNotif?: boolean, showCompose?: boolean }} opts
+ * @param {{
+ *   tone?: string,
+ *   title?: string|null,
+ *   showBack?: boolean,
+ *   showSearch?: boolean,
+ *   showNotif?: boolean,
+ *   showCompose?: boolean,
+ *   profileActions?: string|null,
+ * }} opts
  */
-export function renderGlobalHeader(profile, callbacks, opts = {}) {
+export function updateGlobalHeader(opts = {}) {
   const {
     tone = 'auto',
     title = null,
@@ -52,11 +59,76 @@ export function renderGlobalHeader(profile, callbacks, opts = {}) {
     showSearch = false,
     showNotif = false,
     showCompose = false,
+    profileActions = null,
   } = opts
 
-  const { navigate, openComposer, toggleNotif } = callbacks
+  const header = document.querySelector('#global-header')
+  if (!header) return
 
   // Vorherigen Scroll-Listener entfernen (Cleanup beim Seitenwechsel)
+  if (_scrollListener) {
+    window.removeEventListener('scroll', _scrollListener)
+    _scrollListener = null
+  }
+
+  // Tone
+  header.className = `global-header global-header--${tone}`
+  header.dataset.tone = tone
+
+  // Left: Back or Brand + optional title
+  const left = header.querySelector('.gh-left')
+  left.innerHTML = showBack
+    ? `<button class="gh-btn" id="gh-back" aria-label="Zurück">${iconSvg('chevL', 18)}</button>`
+    : `<button class="gh-brand" id="gh-brand" aria-label="Home">
+         <span class="gh-brand-text">Marvin's Place</span>
+       </button>`
+  if (title) {
+    left.innerHTML += `<span class="gh-title">${title}</span>`
+  }
+
+  // Center: Search
+  const searchWrap = document.getElementById('gh-search-wrap')
+  if (searchWrap) searchWrap.style.display = showSearch ? '' : 'none'
+
+  // Right: Compose, Notif, Profile Actions, Avatar
+  const composeBtn = document.getElementById('gh-compose')
+  if (composeBtn) composeBtn.style.display = showCompose ? '' : 'none'
+
+  const notifWrap = document.getElementById('gh-notif-wrap')
+  if (notifWrap) notifWrap.style.display = showNotif ? '' : 'none'
+
+  const profileActionsEl = document.getElementById('gh-profile-actions')
+  if (profileActionsEl) {
+    if (profileActions) {
+      profileActionsEl.style.display = 'flex'
+      profileActionsEl.innerHTML = profileActions
+    } else {
+      profileActionsEl.style.display = 'none'
+      profileActionsEl.innerHTML = ''
+    }
+  }
+
+  // Avatar immer sichtbar
+  const avatarBtn = document.getElementById('gh-profile')
+  if (avatarBtn) avatarBtn.style.display = ''
+
+  // Wire back button (history.back ist immer gleich)
+  header.querySelector('#gh-back')?.addEventListener('click', () => history.back())
+}
+
+/**
+ * Rendert den globalen Header (für Standalone-Seiten ohne Shell, z.B. board.page.js).
+ * Entfernt den bestehenden Header und erstellt einen neuen.
+ *
+ * @param {object} profile
+ * @param {{ navigate: function }} callbacks
+ * @param {{ tone?: string, title?: string, showBack?: boolean }} opts
+ */
+export function renderGlobalHeader(profile, callbacks, opts = {}) {
+  const { tone = 'auto', title = null, showBack = false } = opts
+  const { navigate } = callbacks
+
+  // Vorherigen Scroll-Listener entfernen
   if (_scrollListener) {
     window.removeEventListener('scroll', _scrollListener)
     _scrollListener = null
@@ -68,7 +140,7 @@ export function renderGlobalHeader(profile, callbacks, opts = {}) {
   const el = document.createElement('header')
   el.id = 'global-header'
   el.className = `global-header global-header--${tone}`
-  el.setAttribute('data-tone', tone)
+  el.dataset.tone = tone
 
   const u = profile?.username
 
@@ -82,25 +154,8 @@ export function renderGlobalHeader(profile, callbacks, opts = {}) {
       }
       ${title ? `<span class="gh-title">${title}</span>` : ''}
     </div>
-    <div class="gh-center">
-      ${showSearch ? `
-        <div class="gh-search-wrap">
-          <span class="gh-search-icon">${iconSvg('search', 15)}</span>
-          <input id="gh-search-input" class="gh-search-input" type="text" placeholder="Suchen…" autocomplete="off" />
-          <div id="gh-search-dropdown" class="gh-search-dropdown" style="display:none;"></div>
-        </div>
-      ` : ''}
-    </div>
+    <div class="gh-center"></div>
     <div class="gh-right">
-      ${showCompose ? `<button class="gh-btn gh-compose" id="gh-compose" aria-label="Posten">${iconSvg('plus', 18)}</button>` : ''}
-      ${showNotif ? `
-        <div style="position:relative;">
-          <button class="gh-btn" id="gh-notif" aria-label="Benachrichtigungen">
-            ${iconSvg('bell', 18)}
-            <span id="gh-notif-badge" class="gh-notif-badge hidden"></span>
-          </button>
-        </div>
-      ` : ''}
       ${u ? `
         <button class="gh-avatar-btn" id="gh-profile" aria-label="Profil">
           <span class="gh-avatar-letter">${(profile.display_name || u)[0].toUpperCase()}</span>
@@ -111,12 +166,9 @@ export function renderGlobalHeader(profile, callbacks, opts = {}) {
 
   document.body.prepend(el)
 
-  // ── Wiring ──────────────────────────────────────────────────────────────────
   el.querySelector('#gh-back')?.addEventListener('click', () => history.back())
   el.querySelector('#gh-brand')?.addEventListener('click', () => navigate('/'))
   el.querySelector('#gh-profile')?.addEventListener('click', () => { if (u) navigate('/u/' + u) })
-  el.querySelector('#gh-compose')?.addEventListener('click', () => openComposer?.(profile))
-  el.querySelector('#gh-notif')?.addEventListener('click', () => toggleNotif?.(profile))
 
   return el
 }
@@ -221,7 +273,7 @@ export function shellHtml(active, profile) {
 let _navListeners = []
 
 /**
- * Verdrahtet alle Nav-Buttons in Shell.
+ * Verdrahtet alle Nav-Buttons in Shell + Global Header.
  * Entfernt vorherige Listener, sodass mehrfacher Aufruf sicher ist.
  * Benötigt navigate() und openComposerModal() als Callbacks,
  * um zirkuläre Imports zu vermeiden.
@@ -249,21 +301,71 @@ export function wireShellNav(profile, { navigate, openComposer, toggleNotif }) {
     el.addEventListener('click', fn)
     _navListeners.push({ el, fn })
   })
+
+  // ── Global Header Buttons verdrahten ───────────────────────────────────────
+
+  const wireHeaderBtn = (sel, fn) => {
+    const el = document.querySelector(sel)
+    if (el) {
+      el.addEventListener('click', fn)
+      _navListeners.push({ el, fn })
+    }
+  }
+
+  wireHeaderBtn('#gh-brand', () => navigate('/'))
+  wireHeaderBtn('#gh-profile', () => { if (u) navigate('/u/' + u) })
+  wireHeaderBtn('#gh-compose', () => openComposer(profile))
+  wireHeaderBtn('#gh-notif', () => toggleNotif(profile))
 }
 
 // ─── Shell Rendering (einmalig) ───────────────────────────────────────────────
 
+let _shellRendered = false
+
 /**
- * Rendert die Shell (Sidebar + Bottombar + <main>) einmalig.
+ * Rendert die Shell (Global Header + Sidebar + Bottombar + <main>) einmalig.
  * Wird nur ausgeführt, wenn noch keine .app-shell im DOM existiert.
  * @param {string} activeKey — aktiver Nav-Key (z.B. 'home')
  * @param {object|null} profile
  */
 export function renderShell(activeKey, profile) {
-  if (document.querySelector('.app-shell')) return
+  if (_shellRendered && document.querySelector('.app-shell')) return
+  _shellRendered = true
+
+  const u = profile?.username
+  const initial = u ? (profile.display_name || u)[0].toUpperCase() : 'M'
 
   document.querySelector('#app').innerHTML = `
     <div class="app-shell">
+      <!-- Persistenter Global Header -->
+      <header id="global-header" class="global-header global-header--auto">
+        <div class="gh-left">
+          <button class="gh-brand" id="gh-brand" aria-label="Home">
+            <span class="gh-brand-text">Marvin's Place</span>
+          </button>
+          <span class="gh-title" id="gh-title" style="display:none;"></span>
+        </div>
+        <div class="gh-center">
+          <div class="gh-search-wrap" id="gh-search-wrap" style="display:none;">
+            <span class="gh-search-icon">${iconSvg('search', 15)}</span>
+            <input id="gh-search-input" class="gh-search-input" type="text" placeholder="Suchen…" autocomplete="off" />
+            <div id="gh-search-dropdown" class="gh-search-dropdown" style="display:none;"></div>
+          </div>
+        </div>
+        <div class="gh-right" id="gh-right">
+          <button class="gh-btn gh-compose" id="gh-compose" style="display:none;" aria-label="Posten">${iconSvg('plus', 18)}</button>
+          <div id="gh-notif-wrap" style="position:relative;display:none;">
+            <button class="gh-btn" id="gh-notif" aria-label="Benachrichtigungen">
+              ${iconSvg('bell', 18)}
+              <span id="gh-notif-badge" class="gh-notif-badge hidden"></span>
+            </button>
+          </div>
+          <div id="gh-profile-actions" style="display:none;align-items:center;gap:6px;"></div>
+          <button class="gh-avatar-btn" id="gh-profile" aria-label="Profil" style="display:none;">
+            <span class="gh-avatar-letter" id="gh-avatar-letter">${initial}</span>
+          </button>
+        </div>
+      </header>
       ${shellHtml(activeKey, profile)}
       <main class="app-main" id="app-main"></main>
     </div>
@@ -272,7 +374,7 @@ export function renderShell(activeKey, profile) {
 
 /**
  * Ersetzt nur den Inhalt von <main id="app-main">.
- * Die Shell (Sidebar + Bottombar) bleibt erhalten.
+ * Die Shell (Header + Sidebar + Bottombar) bleibt erhalten.
  * @param {string} html
  */
 export function updateShellContent(html) {

@@ -1,4 +1,4 @@
-import { updateShellContent, updateActiveNav, wireShellNav, applyNavPref, refreshUnreadBadge, renderGlobalHeader, refreshGlobalHeaderBadge } from '../shell.js'
+import { updateShellContent, updateActiveNav, wireShellNav, applyNavPref, refreshUnreadBadge, updateGlobalHeader, refreshGlobalHeaderBadge } from '../shell.js'
 import { iconSvg, escapeHtml, detectMediaType, renderMediaEl, timeAgo } from '../utils.js'
 import { initGridCols } from '../grid-utils.js'
 import { renderGridControls } from '../grid-controls.js'
@@ -106,8 +106,8 @@ export async function showExplorePage(profile, nav) {
     <!-- Empty / Error State -->
     <div id="explore-state" style="display:none;padding:60px 24px;text-align:center;color:#444;font-size:14px;"></div>`)
 
-  // Globaler Header
-  renderGlobalHeader(profile, nav, {
+  // Globaler Header updaten (persistent via renderShell)
+  updateGlobalHeader({
     tone: 'auto',
     title: 'Explore',
     showCompose: true,

@@ -12,7 +12,7 @@ import { openStoryViewer, openRepostModal } from './feed.page.js'
 import { initGridCols } from '../grid-utils.js'
 import { renderGridControls } from '../grid-controls.js'
 import { escapeHtml, shuffleArray, buildHeaderStyle, buildPatternStyle, buildMusicEmbed, iconSvg, profileHeaderTone } from '../utils.js'
-import { updateShellContent, updateActiveNav, wireShellNav, applyNavPref, renderGlobalHeader, setGlobalHeaderTone, registerHeaderScrollListener } from '../shell.js'
+import { updateShellContent, updateActiveNav, wireShellNav, applyNavPref, updateGlobalHeader, setGlobalHeaderTone, registerHeaderScrollListener } from '../shell.js'
 
 /**
  * Zeigt eine Profilseite.
@@ -148,16 +148,6 @@ export async function showProfilePage(username, ctx) {
             ${profile.bio ? `<div style="font-size:13px;color:${heroBioColor};margin-top:6px;line-height:1.4;text-shadow:${heroTextShadow};">${escapeHtml(profile.bio)}</div>` : ''}
             ${profilePrivacy !== 'public' ? `<div style="margin-top:8px;font-size:11px;color:${heroPrivacyColor};">${profilePrivacy === 'private' ? '🔒 Privates Profil' : '👥 Nur Follower'}</div>` : ''}
           </div>
-        </div>
-        <div style="position:absolute;top:60px;right:14px;z-index:2;display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;max-width:60%;">
-          ${isOwner
-            ? `<button id="btn-edit" class="icon-btn icon-btn-sm" aria-label="Profil bearbeiten" style="background:${heroBtnBg};color:${heroBtnColor};border-color:${heroBtnBorder};">${iconSvg('edit', 14)}</button>
-               <button id="btn-settings-link" class="icon-btn icon-btn-sm" aria-label="Einstellungen" style="background:${heroBtnBg};color:${heroBtnColor};border-color:${heroBtnBorder};">${iconSvg('settings', 14)}</button>`
-            : currentUserId ? `
-              ${!iBlocked ? `<button id="btn-follow" data-state="${followState}" style="padding:6px 14px;background:${followState === 'accepted' ? 'transparent' : followState === 'pending' ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.9)'};color:${followState === 'accepted' ? '#fff' : followState === 'pending' ? '#888' : '#000'};border:1px solid ${followState === 'pending' ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.4)'};border-radius:8px;cursor:pointer;font-size:12px;font-weight:500;">${followState === 'accepted' ? 'Folgst du' : followState === 'pending' ? 'Angefragt' : 'Folgen'}</button>` : ''}
-              <button id="btn-block" class="icon-btn icon-btn-sm" aria-label="${iBlocked ? 'Entblocken' : 'Blockieren'}" style="background:${heroBtnBg};color:${iBlocked ? 'var(--danger)' : heroBtnColor};border-color:${heroBtnBorder};">${iconSvg('ban', 14)}</button>
-            ` : ''
-          }
         </div>
         <button id="btn-info" style="position:absolute;bottom:20px;left:16px;z-index:2;padding:6px 14px;background:${heroBtnBg};color:${heroBtnColor};border:1px solid ${heroBtnBorder};border-radius:20px;cursor:pointer;font-size:12px;backdrop-filter:blur(8px);">
           @${profile.username} · ${boardPosts.length} Posts · ${followerCount} Follower
@@ -318,10 +308,19 @@ export async function showProfilePage(username, ctx) {
       </div>
     </div>`)
 
-  // ── Globaler Header (Profil-Modus) ───────────────────────────────────────────
-  renderGlobalHeader(profile, { navigate }, {
+  // ── Profile Actions für Top Bar ──────────────────────────────────────────────
+  const profileActionsHtml = isOwner
+    ? `<button class="gh-btn" id="btn-edit" aria-label="Profil bearbeiten">${iconSvg('edit', 14)}</button>
+       <button class="gh-btn" id="btn-settings-link" aria-label="Einstellungen">${iconSvg('settings', 14)}</button>`
+    : currentUserId
+      ? `${!iBlocked ? `<button class="gh-btn" id="btn-follow" data-state="${followState}" style="padding:0 12px;font-size:12px;font-weight:600;">${followState === 'accepted' ? 'Folgst du' : followState === 'pending' ? 'Angefragt' : 'Folgen'}</button>` : ''}
+         <button class="gh-btn" id="btn-block" aria-label="${iBlocked ? 'Entblocken' : 'Blockieren'}">${iconSvg('ban', 14)}</button>`
+      : ''
+
+  updateGlobalHeader({
     tone,
     showBack: true,
+    profileActions: profileActionsHtml,
   })
 
   // ── Shell-Navigation verdrahten (Sidebar + Bottombar) ────────────────────────
@@ -333,7 +332,7 @@ export async function showProfilePage(username, ctx) {
 
   // Scroll-Listener: Header-Tone dynamisch anpassen
   // Wenn der Hero-Bereich verlassen wird → 'auto' (Standard-Glasmorphismus)
-  const heroEl = app.querySelector('div[style*="height:300px"]')
+  const heroEl = document.querySelector('#app-main').querySelector('div[style*="height:300px"]')
   const _onProfileScroll = () => {
     const heroBottom = heroEl ? heroEl.getBoundingClientRect().bottom : 0
     if (heroBottom <= 52) {
@@ -364,19 +363,16 @@ export async function showProfilePage(username, ctx) {
     btn.dataset.state = state
     if (state === 'accepted') {
       btn.textContent = 'Folgst du'
-      btn.style.background = 'transparent'
+      btn.style.background = 'rgba(255,255,255,0.15)'
       btn.style.color = '#fff'
-      btn.style.border = '1px solid rgba(255,255,255,0.4)'
     } else if (state === 'pending') {
       btn.textContent = 'Angefragt'
       btn.style.background = 'rgba(255,255,255,0.08)'
       btn.style.color = '#888'
-      btn.style.border = '1px solid rgba(255,255,255,0.2)'
     } else {
       btn.textContent = 'Folgen'
-      btn.style.background = 'rgba(255,255,255,0.9)'
+      btn.style.background = '#fff'
       btn.style.color = '#000'
-      btn.style.border = '1px solid rgba(255,255,255,0.4)'
     }
   }
 
