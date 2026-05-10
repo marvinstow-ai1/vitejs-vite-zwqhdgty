@@ -36,6 +36,21 @@ function getNavCallbacks() {
   }
 }
 
+// ─── Helper: Shell sicherstellen ──────────────────────────────────────────────
+
+/**
+ * Stellt sicher, dass die Shell (Sidebar + Bottombar + <main>) existiert.
+ * Wird bei direktem Browser-Refresh auf Nicht-Feed-Seiten benötigt.
+ * @param {object} profile
+ * @param {string} activeKey
+ */
+function ensureShell(profile, activeKey) {
+  if (!document.querySelector('.app-shell')) {
+    renderShell(activeKey, profile)
+    wireShellNav(profile, getNavCallbacks())
+  }
+}
+
 // ─── Init ─────────────────────────────────────────────────────────────────────
 
 async function init() {
@@ -68,6 +83,14 @@ registerHandlers({
   init,
 
   async profile(username) {
+    // Bei direktem Refresh: Profile + Shell sicherstellen
+    if (!currentProfile) {
+      const session = await getSession()
+      if (!session) { showLogin(init); return }
+      currentProfile = await getProfileById(session.user.id)
+      if (!currentProfile?.username) { init(); return }
+    }
+    ensureShell(currentProfile, 'profile')
     await showProfilePage(username, getNavCallbacks())
   },
 
@@ -79,6 +102,7 @@ registerHandlers({
       currentProfile = await getProfileById(session.user.id)
       if (!currentProfile?.username) { init(); return }
     }
+    ensureShell(currentProfile, 'explore')
     showExplorePage(currentProfile, getNavCallbacks())
   },
 
@@ -89,6 +113,7 @@ registerHandlers({
       currentProfile = await getProfileById(session.user.id)
     }
     if (!currentProfile) { showLogin(init); return }
+    ensureShell(currentProfile, 'settings')
     await showSettingsPage(currentProfile, session, {
       ...getNavCallbacks(),
       realtimeChannel,
