@@ -13,6 +13,7 @@ import { searchProfiles } from '../services/profiles.service.js'
 // ─── Feed-scoped state ────────────────────────────────────────────────────────
 let activeMood = null
 let searchTimeout = null
+let _notifChannel = null
 
 // ─── Feed Page ────────────────────────────────────────────────────────────────
 
@@ -828,6 +829,12 @@ export function openRepostModal(boards, onConfirm) {
 // ─── Notifications (feed-local) ───────────────────────────────────────────────
 
 function _setupNotifications(currentUserId, ctx) {
+  // Alten Notification-Channel entfernen (wichtig bei wiederholtem showFeed()-Aufruf)
+  if (_notifChannel) {
+    try { supabase.removeChannel(_notifChannel) } catch (_) {}
+    _notifChannel = null
+  }
+
   // Globaler Header Notif-Button
   const ghNotif = document.querySelector('#gh-notif')
   const dropdown = document.querySelector('#notif-dropdown')
@@ -848,12 +855,12 @@ function _setupNotifications(currentUserId, ctx) {
     _renderNotifications(currentUserId)
   })
 
-  const channel = subscribeToNotifications(currentUserId, () => {
+  _notifChannel = subscribeToNotifications(currentUserId, () => {
     _refreshNotifBadge(currentUserId)
     const dd = document.querySelector('#notif-dropdown')
     if (dd?.style.display === 'block') _renderNotifications(currentUserId)
   })
-  ctx.onNotifChannelReady?.(channel)
+  ctx.onNotifChannelReady?.(_notifChannel)
 }
 
 async function _refreshNotifBadge(currentUserId) {
