@@ -1,5 +1,7 @@
 import { shellHtml, wireShellNav, applyNavPref, refreshUnreadBadge, renderGlobalHeader, refreshGlobalHeaderBadge } from '../shell.js'
 import { iconSvg, escapeHtml, detectMediaType, renderMediaEl, timeAgo } from '../utils.js'
+import { initGridCols } from '../grid-utils.js'
+import { renderGridControls } from '../grid-controls.js'
 import { loadExplorePosts, loadExploreMoodTags, loadSuggestedUsers, loadPostInteractions, loadUsernameMap } from '../services/posts.service.js'
 import { toggleLike, addRepost, removeRepost, getOrCreateRepostsBoardId, loadComments, insertComment } from '../services/interactions.service.js'
 import { notifyAction } from '../services/notify.action.js'
@@ -14,23 +16,7 @@ let exploreLoading = false
 let exploreHasMore = true
 const EXPLORE_LIMIT = 30
 
-// ─── CSS (einmalig injizieren) ────────────────────────────────────────────────
-const EXPLORE_GRID_CSS = `
-#explore-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:2px;padding:2px;}
-.explore-card{position:relative;overflow:hidden;background:#111;aspect-ratio:9/16;cursor:pointer;contain:strict;}
-.explore-card img,.explore-card video{width:100%;height:100%;object-fit:cover;display:block;transition:transform .3s;}
-.explore-card:hover img,.explore-card:hover video{transform:scale(1.04);}
-.explore-mute-btn{position:absolute;bottom:6px;right:6px;z-index:4;width:26px;height:26px;border-radius:50%;border:none;background:rgba(0,0,0,0.45);color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:12px;line-height:1;backdrop-filter:blur(4px);padding:0;}
-.explore-mute-btn:hover{background:rgba(0,0,0,0.7);}
-`
-let _exploreCssInjected = false
-function _injectExploreCss() {
-  if (_exploreCssInjected) return
-  _exploreCssInjected = true
-  const s = document.createElement('style')
-  s.textContent = EXPLORE_GRID_CSS
-  document.head.appendChild(s)
-}
+// ─── Explore-scoped state (continued) ─────────────────────────────────────────
 
 // ─── IntersectionObserver für Video-Autoplay ──────────────────────────────────
 let _exploreObserver = null
@@ -63,8 +49,6 @@ export async function showExplorePage(profile, nav) {
   exploreCursor = null
   exploreLoading = false
   exploreHasMore = true
-
-  _injectExploreCss()
 
   document.querySelector('#app').innerHTML = `
     <div class="app-shell">
@@ -110,8 +94,11 @@ export async function showExplorePage(profile, nav) {
           </button>
         </div>
 
-        <!-- Post Grid (CSS-Grid via injected style) -->
-        <div id="explore-grid"></div>
+        <!-- Grid Controls -->
+        <div id="explore-grid-controls" class="grid-controls"></div>
+
+        <!-- Post Grid (Unified Grid) -->
+        <div id="explore-grid" class="unified-grid"></div>
 
         <!-- Load More -->
         <div id="explore-more" style="display:none;padding:20px;text-align:center;">
@@ -135,6 +122,10 @@ export async function showExplorePage(profile, nav) {
     refreshUnreadBadge(c)
     refreshGlobalHeaderBadge(c)
   }).catch(() => {})
+
+  // Unified Grid initialisieren
+  initGridCols('#explore-grid')
+  renderGridControls(document.querySelector('#explore-grid-controls'), '#explore-grid')
 
   // Mood-Chips + Suggestions + erste Posts parallel laden
   _loadMoodChips(profile, nav)
@@ -318,7 +309,7 @@ function _renderExploreCard(post, currentUserId, usernameMap, interactions) {
     : ''
 
   return `
-    <div class="explore-card" data-post-id="${post.id}">
+    <div class="unified-cell" data-post-id="${post.id}">
       <div class="explore-media" data-post-id="${post.id}" data-media-url="${escapeHtml(post.media_url || '')}" data-media-type="${mt}" data-owner-id="${post.user_id}" style="position:absolute;inset:0;">
         ${mediaHtml}
       </div>
@@ -358,7 +349,7 @@ function _wireExploreActions(profile, nav) {
   const obs = _getExploreObserver()
 
   // Hover-Overlay auf Desktop + Video-Autoplay via IntersectionObserver
-  document.querySelectorAll('#explore-grid .explore-card').forEach(card => {
+  document.querySelectorAll('#explore-grid .unified-cell').forEach(card => {
     const overlay = card.querySelector('.explore-overlay')
     if (overlay) {
       card.addEventListener('mouseenter', () => {
@@ -381,7 +372,7 @@ function _wireExploreActions(profile, nav) {
     btn.dataset.wired = '1'
     btn.addEventListener('click', e => {
       e.stopPropagation()
-      const card = btn.closest('.explore-card')
+      const card = btn.closest('.unified-cell')
       const v = card?.querySelector('video')
       if (!v) return
       const nowMuted = btn.dataset.muted === '1'

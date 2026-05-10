@@ -581,19 +581,10 @@ body[data-nav="bottom"] .app-main { padding-bottom: 96px; }
 }
 .toast.show { opacity: 1; }
 
-/* ─── Feed grid (mobile-first) ─────────────────────────────── */
+/* ─── Feed wrapper ─────────────────────────────────────────── */
 .feed-wrap { max-width: 720px; margin: 0 auto; padding: 12px 12px 96px; }
-.feed-grid { column-count: 2; column-gap: 8px; }
-@media (min-width: 600px) { .feed-grid { column-count: 3; column-gap: 10px; } }
-@media (min-width: 900px) { .feed-grid { column-count: 3; column-gap: 12px; } }
-.feed-card {
-  break-inside: avoid;
-  margin-bottom: 8px;
-  border-radius: 10px;
-  overflow: hidden;
-  background: #111;
-  border: 1px solid #1a1a1a;
-}
+
+/* ─── Feed card foot (shared across pages) ─────────────────── */
 .feed-card-foot {
   display: flex; align-items: center; justify-content: space-between;
   padding: 8px 10px;
@@ -746,5 +737,235 @@ input::placeholder, textarea::placeholder { color: rgba(255,255,255,.35); }
   
   .discovery-tile {
     padding: 14px 16px;
+  }
+}
+
+/* =============================================
+   Unified Grid System (from moodboard)
+   ============================================= */
+.unified-grid {
+  display: grid;
+  gap: 2px;
+  padding: 2px;
+}
+
+.unified-cell {
+  position: relative;
+  overflow: hidden;
+  background: #111;
+  aspect-ratio: 9/16;
+  cursor: pointer;
+  contain: strict;
+}
+
+.unified-cell img,
+.unified-cell video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: transform .3s;
+}
+
+.unified-cell:hover img,
+.unified-cell:hover video {
+  transform: scale(1.04);
+}
+
+/* Grid Controls */
+.grid-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+}
+
+.grid-controls-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: rgba(255,255,255,.06);
+  color: #fff;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  backdrop-filter: blur(16px);
+  transition: .15s;
+  flex-shrink: 0;
+}
+
+.grid-controls-btn:hover {
+  background: rgba(255,255,255,.13);
+}
+
+/* Filter Popup */
+.filter-popup {
+  position: fixed;
+  bottom: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 35;
+  width: 280px;
+  display: none;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: var(--panel);
+  backdrop-filter: blur(24px);
+  box-shadow: 0 20px 50px rgba(0,0,0,.6);
+}
+
+.filter-popup.show {
+  display: flex;
+}
+
+.fp-header {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: .1em;
+  opacity: .4;
+  text-align: center;
+}
+
+.fp-divider {
+  height: 1px;
+  background: rgba(255,255,255,.07);
+  margin: 8px 0;
+}
+
+.fp-sort-btn {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: #fff;
+  text-align: left;
+  padding: 10px;
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  transition: .12s;
+}
+
+.fp-sort-btn:hover {
+  background: rgba(255,255,255,.08);
+}
+
+.fp-sort-btn.active {
+  background: rgba(255,255,255,.12);
+}
+
+.fp-sort-btn .fp-sort-icon {
+  font-size: 15px;
+  opacity: .6;
+  width: 18px;
+  text-align: center;
+}
+
+/* Swipe Control */
+.swipe-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+  width: 100%;
+  height: 44px;
+}
+
+.swipe-arrow {
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  border: none;
+  background: rgba(255,255,255,.08);
+  color: #fff;
+  cursor: pointer;
+  font-size: 13px;
+  display: grid;
+  place-items: center;
+  transition: .12s;
+  flex-shrink: 0;
+  padding: 0;
+  line-height: 1;
+}
+
+.swipe-arrow:hover {
+  background: rgba(255,255,255,.18);
+}
+
+.swipe-arrow:active {
+  transform: scale(.9);
+}
+
+.swipe-track-wrap {
+  flex: 1;
+  position: relative;
+  height: 36px;
+  display: flex;
+  align-items: center;
+}
+
+.swipe-track {
+  position: relative;
+  width: 100%;
+  height: 4px;
+  background: rgba(255,255,255,.12);
+  border-radius: 999px;
+  overflow: visible;
+}
+
+.swipe-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  background: rgba(255,255,255,.4);
+  border-radius: 999px;
+  pointer-events: none;
+  transition: width .08s ease;
+}
+
+.swipe-thumb {
+  position: absolute;
+  top: 50%;
+  z-index: 2;
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  background: #fff;
+  color: #111;
+  font-size: 12px;
+  font-weight: 700;
+  display: grid;
+  place-items: center;
+  box-shadow: 0 2px 8px rgba(0,0,0,.4);
+  cursor: grab;
+  transition: left .08s ease, box-shadow .15s;
+  transform: translate(-50%, -50%);
+  will-change: left;
+}
+
+.swipe-thumb:active {
+  cursor: grabbing;
+  box-shadow: 0 4px 14px rgba(0,0,0,.5);
+}
+
+.swipe-thumb.dragging {
+  transition: none;
+}
+
+/* Responsive: Mobile */
+@media (max-width: 600px) {
+  .filter-popup {
+    width: 240px;
+    bottom: 72px;
   }
 }

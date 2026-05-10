@@ -1,6 +1,8 @@
 import { supabase } from '../supabase.js'
 import { shellHtml, wireShellNav, applyNavPref, refreshUnreadBadge, renderGlobalHeader, refreshGlobalHeaderBadge } from '../shell.js'
 import { iconSvg, escapeHtml, detectMediaType, renderMediaEl, timeAgo } from '../utils.js'
+import { initGridCols } from '../grid-utils.js'
+import { renderGridControls } from '../grid-controls.js'
 import { loadFeedPosts, getVisiblePostIds, loadPostInteractions, loadMoodTags, loadUsernameMap, insertPost } from '../services/posts.service.js'
 import { toggleLike, addRepost, removeRepost, getOrCreateRepostsBoardId, loadComments, insertComment, getLikeCount, acceptFollowRequest, rejectFollowRequest } from '../services/interactions.service.js'
 import { getBoardsByUser } from '../services/boards.service.js'
@@ -75,9 +77,12 @@ export async function showFeed(profile, ctx) {
           </button>
         </div>
 
+        <!-- Grid Controls -->
+        <div id="feed-grid-controls" class="grid-controls"></div>
+
         <div class="feed-wrap">
           <div id="feed-active-filter" class="hidden" style="display:flex;align-items:center;gap:8px;padding:8px 4px 12px;color:#888;font-size:12px;"></div>
-          <div id="feed-grid" class="feed-grid"></div>
+          <div id="feed-grid" class="unified-grid"></div>
           <div id="feed-state" class="feed-state hidden"></div>
         </div>
       </main>
@@ -147,6 +152,10 @@ export async function showFeed(profile, ctx) {
       window.location.hash = '#/boards/suggested';
     }
   });
+
+  // Unified Grid initialisieren
+  initGridCols('#feed-grid')
+  renderGridControls(document.querySelector('#feed-grid-controls'), '#feed-grid')
 
   await loadFeed(profile, navigate)
 }
@@ -254,7 +263,7 @@ function _renderFeedCard(post, currentUserId, usernameMap, interactions) {
     ? `<div style="position:absolute;top:6px;left:6px;background:rgba(0,0,0,0.65);border-radius:10px;padding:2px 7px;font-size:10px;color:#ccc;">${vis === 'followers' ? '👥' : '🔒'}</div>`
     : ''
   return `
-    <div class="feed-card" data-post-id="${post.id}">
+    <div class="unified-cell" data-post-id="${post.id}">
       <div class="post-media-wrap" data-post-id="${post.id}" data-media-url="${escapeHtml(post.media_url)}" data-media-type="${mt}" data-owner-id="${post.user_id}" style="cursor:${isEmbed ? 'default' : 'pointer'};position:relative;">
         ${renderMediaEl(post.media_url, mt)}
         ${visBadge}

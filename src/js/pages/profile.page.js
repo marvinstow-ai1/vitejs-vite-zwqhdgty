@@ -9,6 +9,8 @@ import { getBoardsByUser, getProfileReposts, getUserRepostIds, createBoard, upda
 import { loadProfileStories, getViewedStoryIds } from '../services/stories.service.js'
 import { renderBoardPost, wireBoardRepostButtons, wireBoardVideos, loadBoardContent } from './board.page.js'
 import { openStoryViewer, openRepostModal } from './feed.page.js'
+import { initGridCols } from '../grid-utils.js'
+import { renderGridControls } from '../grid-controls.js'
 import { escapeHtml, shuffleArray, buildHeaderStyle, buildPatternStyle, buildMusicEmbed, iconSvg, profileHeaderTone } from '../utils.js'
 import { renderGlobalHeader, setGlobalHeaderTone, registerHeaderScrollListener } from '../shell.js'
 
@@ -202,7 +204,8 @@ export async function showProfilePage(username, ctx) {
 
         <!-- Board Content -->
         <div id="board-content">
-          <div class="board-grid">
+          <div class="grid-controls" id="profile-grid-controls"></div>
+          <div class="unified-grid" id="profile-grid">
             ${shuffled.map(post => renderBoardPost(post, isOwner, { viewerId: currentUserId, viewerReposted: viewerRepostedSet.has(post.id) })).join('')}
             ${!shuffled.length ? `<p style="color:#333;font-size:14px;padding:40px;grid-column:1/-1;">Noch keine Posts.</p>` : ''}
           </div>
@@ -450,9 +453,11 @@ export async function showProfilePage(username, ctx) {
         const boardId = tab.dataset.board
         const content = document.querySelector('#board-content')
         if (boardId === 'all') {
-          content.innerHTML = `<div class="board-grid">${shuffled.map(post => renderBoardPost(post, isOwner, { viewerId: currentUserId, viewerReposted: viewerRepostedSet.has(post.id) })).join('') || '<p style="color:#333;font-size:14px;padding:40px;grid-column:1/-1;">Noch keine Posts.</p>'}</div>`
+          content.innerHTML = `<div class="grid-controls" id="profile-grid-controls"></div><div class="unified-grid" id="profile-grid">${shuffled.map(post => renderBoardPost(post, isOwner, { viewerId: currentUserId, viewerReposted: viewerRepostedSet.has(post.id) })).join('') || '<p style="color:#333;font-size:14px;padding:40px;grid-column:1/-1;">Noch keine Posts.</p>'}</div>`
           wireBoardRepostButtons(currentUserId, (bds, cb) => openRepostModal(bds, cb))
           wireBoardVideos(content)
+          initGridCols('#profile-grid')
+          renderGridControls(document.querySelector('#profile-grid-controls'), '#profile-grid')
         } else {
           content.innerHTML = `<p style="padding:24px;color:#444;font-size:13px;">Lädt...</p>`
           await loadBoardContent(boardId, content, isOwner, currentUserId, boards, profile.username, {
@@ -465,6 +470,10 @@ export async function showProfilePage(username, ctx) {
 
     wireBoardRepostButtons(currentUserId, (bds, cb) => openRepostModal(bds, cb))
     wireBoardVideos(document.querySelector('#board-content'))
+
+    // Unified Grid initialisieren (für "Alle Posts"-Tab)
+    initGridCols('#profile-grid')
+    renderGridControls(document.querySelector('#profile-grid-controls'), '#profile-grid')
 
     document.querySelector('#btn-new-board')?.addEventListener('click', () => _openBoardModal(null, currentUserId, profile.username, navigate))
   }

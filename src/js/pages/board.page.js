@@ -5,24 +5,8 @@ import { getVisiblePostIds } from '../services/posts.service.js'
 import { escapeHtml, detectMediaType, getYouTubeEmbedUrl, buildMusicEmbed } from '../utils.js'
 import { addRepost, removeRepost } from '../services/interactions.service.js'
 import { renderGlobalHeader } from '../shell.js'
-
-// ── Grid-CSS (einmalig injizieren) ────────────────────────────────────────────
-const BOARD_GRID_CSS = `
-.board-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:2px;padding:2px;}
-.board-cell{position:relative;overflow:hidden;background:#111;aspect-ratio:9/16;cursor:pointer;}
-.board-cell img,.board-cell video{width:100%;height:100%;object-fit:cover;display:block;transition:transform .3s;}
-.board-cell:hover img,.board-cell:hover video{transform:scale(1.04);}
-.board-mute-btn{position:absolute;bottom:6px;right:6px;z-index:4;width:26px;height:26px;border-radius:50%;border:none;background:rgba(0,0,0,0.45);color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:12px;line-height:1;backdrop-filter:blur(4px);padding:0;}
-.board-mute-btn:hover{background:rgba(0,0,0,0.7);}
-`
-let _boardCssInjected = false
-function _injectBoardCss() {
-  if (_boardCssInjected) return
-  _boardCssInjected = true
-  const s = document.createElement('style')
-  s.textContent = BOARD_GRID_CSS
-  document.head.appendChild(s)
-}
+import { initGridCols } from '../grid-utils.js'
+import { renderGridControls } from '../grid-controls.js'
 
 // ── IntersectionObserver für Video-Autoplay ───────────────────────────────────
 let _boardObserver = null
@@ -42,7 +26,6 @@ function _getBoardObserver() {
  * Rendert einen einzelnen Board-Post als Kachel (9:16 Grid, kein Masonry).
  */
 export function renderBoardPost(post, isOwner, opts = {}) {
-  _injectBoardCss()
   const { viewerId = null, viewerReposted = false } = opts
   const mt = post.media_type || detectMediaType(post.media_url)
   const vis = post.visibility || 'public'
@@ -54,13 +37,13 @@ export function renderBoardPost(post, isOwner, opts = {}) {
     ? `<button class="board-repost-btn" data-post-id="${post.id}" data-owner-id="${post.user_id}" data-reposted="${viewerReposted}" aria-label="Reposten" style="position:absolute;top:4px;right:4px;z-index:4;background:rgba(0,0,0,0.65);border:none;border-radius:50%;width:26px;height:26px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:${viewerReposted ? '#06d6a0' : '#fff'};font-size:13px;line-height:1;">🔁</button>`
     : ''
   if (mt === 'video' || mt === 'gif') {
-    return `<div class="board-cell" data-post-id="${post.id}"><video src="${post.media_url}" muted loop playsinline preload="none" style="width:100%;height:100%;object-fit:cover;display:block;"></video>${badge}${repostBtn}<button class="board-mute-btn" data-muted="1" title="Ton umschalten">🔇</button></div>`
+    return `<div class="unified-cell" data-post-id="${post.id}"><video src="${post.media_url}" muted loop playsinline preload="none" style="width:100%;height:100%;object-fit:cover;display:block;"></video>${badge}${repostBtn}<button class="board-mute-btn" data-muted="1" title="Ton umschalten">🔇</button></div>`
   }
   if (mt === 'youtube') {
     const embedUrl = getYouTubeEmbedUrl(post.media_url)
-    return `<div class="board-cell" data-post-id="${post.id}" style="aspect-ratio:1;"><iframe src="${embedUrl}" style="position:absolute;inset:0;width:100%;height:100%;border:none;" allow="autoplay;encrypted-media" allowfullscreen></iframe>${badge}${repostBtn}</div>`
+    return `<div class="unified-cell" data-post-id="${post.id}" style="aspect-ratio:1;"><iframe src="${embedUrl}" style="position:absolute;inset:0;width:100%;height:100%;border:none;" allow="autoplay;encrypted-media" allowfullscreen></iframe>${badge}${repostBtn}</div>`
   }
-  return `<div class="board-cell" data-post-id="${post.id}"><img src="${post.media_url}" alt="" loading="lazy" onerror="this.style.display='none'" />${badge}${repostBtn}</div>`
+  return `<div class="unified-cell" data-post-id="${post.id}"><img src="${post.media_url}" alt="" loading="lazy" onerror="this.style.display='none'" />${badge}${repostBtn}</div>`
 }
 
 /**
@@ -69,7 +52,7 @@ export function renderBoardPost(post, isOwner, opts = {}) {
  */
 export function wireBoardVideos(container) {
   const obs = _getBoardObserver()
-  container.querySelectorAll('.board-cell video').forEach(v => {
+  container.querySelectorAll('.unified-cell video').forEach(v => {
     obs.observe(v)
   })
   container.querySelectorAll('.board-mute-btn').forEach(btn => {
@@ -77,7 +60,7 @@ export function wireBoardVideos(container) {
     btn.dataset.wired = '1'
     btn.addEventListener('click', e => {
       e.stopPropagation()
-      const cell = btn.closest('.board-cell')
+      const cell = btn.closest('.unified-cell')
       const v = cell?.querySelector('video')
       if (!v) return
       const nowMuted = btn.dataset.muted === '1'
@@ -161,7 +144,8 @@ export async function loadBoardContent(boardId, container, isOwner, currentUserI
       </div>
     </div>
     ${board.playlist_url ? `<div class="board-music-panel" style="display:none;padding:0 16px;margin-top:12px;"></div>` : ''}
-    <div class="board-grid" style="margin-top:12px;">
+    <div id="board-grid-controls" class="grid-controls"></div>
+    <div class="unified-grid" id="board-grid" style="margin-top:12px;">
       ${posts.map(post => renderBoardPost(post, isOwner, { viewerId: currentUserId, viewerReposted: viewerRepostedSet.has(post.id) })).join('')}
       ${!posts.length ? `<p style="color:#333;font-size:14px;padding:40px;grid-column:1/-1;">Dieses Board ist leer.</p>` : ''}
     </div>
@@ -176,6 +160,13 @@ export async function loadBoardContent(boardId, container, isOwner, currentUserI
 
   wireBoardRepostButtons(currentUserId, openRepostModal)
   wireBoardVideos(container)
+
+  // Unified Grid initialisieren
+  const boardGrid = container.querySelector('#board-grid')
+  if (boardGrid) {
+    initGridCols('#board-grid')
+    renderGridControls(container.querySelector('#board-grid-controls'), '#board-grid')
+  }
 
   container.querySelector('.board-playlist-btn')?.addEventListener('click', e => {
     const panel = container.querySelector('.board-music-panel')
