@@ -120,6 +120,7 @@ export async function showSettingsPage(profile, session, ctx) {
   updateGlobalHeader({
     tone: 'auto',
     title: 'Einstellungen',
+    showSearch: true,
     showBack: true,
   })
 

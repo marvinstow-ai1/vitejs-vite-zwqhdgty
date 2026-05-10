@@ -110,6 +110,7 @@ export async function showExplorePage(profile, nav) {
   updateGlobalHeader({
     tone: 'auto',
     title: 'Explore',
+    showSearch: true,
     showCompose: true,
   })
 

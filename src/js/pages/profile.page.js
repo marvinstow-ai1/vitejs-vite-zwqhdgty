@@ -129,7 +129,7 @@ export async function showProfilePage(username, ctx) {
     <div style="background:#0a0a0a;min-height:100vh;color:#fff;">
 
       <!-- Hero Header (kein padding-top — globaler Header überlagert) -->
-      <div style="position:relative;width:100%;height:300px;overflow:hidden;${headerStyle}">
+      <div style="position:relative;width:100%;height:200px;overflow:hidden;${headerStyle}">
         ${profile.header_type === 'image' && profile.header_image_url
           ? `<img src="${profile.header_image_url}" alt="" style="position:absolute;width:100%;height:100%;object-fit:cover;transform:translate(${(profile.header_image_position?.x || 50) - 50}%, ${(profile.header_image_position?.y || 50) - 50}%) scale(${profile.header_image_position?.zoom || 1});transform-origin:center;" />`
           : ''}
@@ -137,8 +137,8 @@ export async function showProfilePage(username, ctx) {
           ? `<div style="position:absolute;inset:0;${buildPatternStyle(profile.header_pattern)}opacity:0.25;"></div>`
           : ''}
         <!-- Gradient-Overlay unten für sanften Übergang -->
-        <div style="position:absolute;bottom:0;left:0;right:0;height:120px;background:linear-gradient(to bottom,transparent,#0a0a0a);pointer-events:none;z-index:1;"></div>
-        <div style="position:absolute;top:64px;left:20px;z-index:2;max-width:65%;display:flex;align-items:flex-start;gap:12px;">
+        <div style="position:absolute;bottom:0;left:0;right:0;height:80px;background:linear-gradient(to bottom,transparent 30%,rgba(10,10,10,0.95));pointer-events:none;z-index:1;"></div>
+        <div style="position:absolute;top:56px;left:20px;z-index:2;max-width:65%;display:flex;align-items:flex-start;gap:12px;">
           ${hasStories ? `
             <div id="profile-story-ring" style="width:52px;height:52px;border-radius:50%;padding:2px;background:${hasUnseenStories ? 'linear-gradient(135deg,#ff4d6d,#ffd60a,#06d6a0)' : 'rgba(255,255,255,0.4)'};cursor:pointer;flex-shrink:0;">
               <div style="width:100%;height:100%;border-radius:50%;background:#1a1a1a;display:flex;align-items:center;justify-content:center;font-size:20px;color:#fff;border:2px solid #0a0a0a;">${(profile.username || '?')[0].toUpperCase()}</div>
@@ -319,6 +319,7 @@ export async function showProfilePage(username, ctx) {
 
   updateGlobalHeader({
     tone,
+    showSearch: true,
     showBack: true,
     profileActions: profileActionsHtml,
   })
