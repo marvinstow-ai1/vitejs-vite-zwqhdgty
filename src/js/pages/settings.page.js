@@ -63,12 +63,10 @@ export async function showSettingsPage(profile, session, ctx) {
           <span class="settings-tile-desc">Auto · Sidebar · Bottom</span>
         </button>
 
-        <button class="settings-tile danger" data-action="logout">
-          <span class="settings-tile-icon">⏻</span>
-          <span class="settings-tile-title">Ausloggen</span>
-          <span class="settings-tile-desc">Session beenden</span>
-        </button>
+      </div>
 
+      <div style="display:flex;justify-content:center;margin-top:32px;">
+        <button id="set-logout" class="logout-btn">⏻ Ausloggen</button>
       </div>
     </div>
 
@@ -98,9 +96,11 @@ export async function showSettingsPage(profile, session, ctx) {
       else if (action === 'privacy') openPrivacyModal(profile)
       else if (action === 'blocks') openBlocksModal(profile.id)
       else if (action === 'nav') openNavModal()
-      else if (action === 'logout') handleLogout(ctx)
     })
   })
+
+  // ── Logout Button ──
+  document.getElementById('set-logout')?.addEventListener('click', () => handleLogout(ctx))
 }
 
 // ─────────────────────────────────────────────────────────────────
