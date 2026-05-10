@@ -29,28 +29,28 @@ export function openSettingsModal(profile, ctx) {
       <div class="settings-modal-body">
         <div class="settings-grid">
           <button class="settings-tile" id="set-edit-profile">
-            <span class="settings-tile-icon">&#9998;</span>
+            <span class="settings-tile-icon">${iconSvg('edit', 20)}</span>
             <span class="settings-tile-title">Profil bearbeiten</span>
             <span class="settings-tile-desc">Name, Bio, Header, Links</span>
           </button>
           <button class="settings-tile" id="set-privacy">
-            <span class="settings-tile-icon">&#128274;</span>
+            <span class="settings-tile-icon">${iconSvg('lock', 20)}</span>
             <span class="settings-tile-title">Privacy</span>
             <span class="settings-tile-desc">Profil-Sichtbarkeit</span>
           </button>
           <button class="settings-tile" id="set-blocks">
-            <span class="settings-tile-icon">&#128683;</span>
+            <span class="settings-tile-icon">${iconSvg('ban', 20)}</span>
             <span class="settings-tile-title">Blockierte Nutzer</span>
             <span class="settings-tile-desc">Verwalte Blockierungen</span>
           </button>
           <button class="settings-tile" id="set-nav">
-            <span class="settings-tile-icon">&#8858;</span>
+            <span class="settings-tile-icon">${iconSvg('layout', 20)}</span>
             <span class="settings-tile-title">Navigation</span>
             <span class="settings-tile-desc">Sidebar oder Bottom</span>
           </button>
         </div>
         <div style="display:flex;justify-content:center;margin-top:32px;">
-          <button id="set-logout" class="logout-btn">&#128163; Ausloggen</button>
+          <button id="set-logout" class="logout-btn" style="display:inline-flex;align-items:center;gap:8px;">${iconSvg('power', 18)} Ausloggen</button>
         </div>
       </div>
     </div>
@@ -245,7 +245,7 @@ function openEditModal(profile, ctx) {
               : `<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-dim);font-size:13px;">Noch kein Foto</div>`}
           </div>
           <input id="header-file" type="file" accept="image/*" style="display:none;" />
-          <button id="btn-upload" class="btn btn-block" style="margin-bottom:10px;">📷 Foto ausw\u00e4hlen</button>
+          <button id="btn-upload" class="btn btn-block" style="margin-bottom:10px;display:inline-flex;align-items:center;justify-content:center;gap:6px;">${iconSvg('upload', 14)} Foto ausw\u00e4hlen</button>
           <div style="display:flex;align-items:center;gap:10px;">
             <span style="color:var(--text-dim);font-size:11px;white-space:nowrap;">Zoom:</span>
             <input type="range" id="zoom-slider" min="1" max="3" step="0.05" value="${currentImagePos.zoom}" style="flex:1;accent-color:#fff;" />
@@ -375,9 +375,9 @@ function openPrivacyModal(profile) {
       <div class="modal-body">
         <p style="color:var(--text-mute);font-size:13px;margin-bottom:16px;">Wer dein Profil und deine Posts sehen darf.</p>
         <div class="seg" id="pv-seg">
-          <button class="seg-btn ${profilePrivacy === 'public' ? 'active' : ''}" data-pv="public">🌍 \u00d6ffentlich</button>
-          <button class="seg-btn ${profilePrivacy === 'followers' ? 'active' : ''}" data-pv="followers">👥 Follower</button>
-          <button class="seg-btn ${profilePrivacy === 'private' ? 'active' : ''}" data-pv="private">🔒 Privat</button>
+          <button class="seg-btn ${profilePrivacy === 'public' ? 'active' : ''}" data-pv="public" style="display:inline-flex;align-items:center;gap:6px;">${iconSvg('globe', 14)} \u00d6ffentlich</button>
+          <button class="seg-btn ${profilePrivacy === 'followers' ? 'active' : ''}" data-pv="followers" style="display:inline-flex;align-items:center;gap:6px;">${iconSvg('users', 14)} Follower</button>
+          <button class="seg-btn ${profilePrivacy === 'private' ? 'active' : ''}" data-pv="private" style="display:inline-flex;align-items:center;gap:6px;">${iconSvg('lock', 14)} Privat</button>
         </div>
         <p style="color:var(--text-dim);font-size:11px;margin-top:12px;">\u00d6ffentlich = alle sehen dein Profil · Follower = nur wer dir folgt · Privat = nur du</p>
       </div>

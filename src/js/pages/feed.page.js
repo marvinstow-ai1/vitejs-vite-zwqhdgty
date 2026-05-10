@@ -46,12 +46,12 @@ export async function showFeed(profile, ctx) {
     <!-- NEU: Discovery-Kacheln -->
     <div class="discovery-tiles">
       <button class="discovery-tile" data-discovery="personal">
-        <div class="discovery-tile-icon">✨</div>
+        <div class="discovery-tile-icon">${iconSvg('spark', 16)}</div>
         <div class="discovery-tile-content">
           <div class="discovery-tile-title">Für dich</div>
           <div class="discovery-tile-desc">Beiträge, die zu dir passen</div>
         </div>
-        <div class="discovery-tile-chev">›</div>
+        <div class="discovery-tile-chev">${iconSvg('chevR', 14)}</div>
       </button>
       <button class="discovery-tile" data-discovery="boards">
         <div class="discovery-tile-icon discovery-tile-icon--boards">
@@ -71,7 +71,7 @@ export async function showFeed(profile, ctx) {
           <div class="discovery-tile-title">Board-Vorschläge</div>
           <div class="discovery-tile-desc">Entdecke neue Boards</div>
         </div>
-        <div class="discovery-tile-chev">›</div>
+        <div class="discovery-tile-chev">${iconSvg('chevR', 14)}</div>
       </button>
     </div>
 
@@ -212,7 +212,7 @@ function _showState(html) {
 
 function _showWelcomeState(profile, navigate) {
   _showState(`
-    <div style="font-size:30px;margin-bottom:10px;">🌱</div>
+    <div style="font-size:30px;margin-bottom:10px;">${iconSvg('plant', 30)}</div>
     <p style="color:#ccc;font-size:14px;margin:0 0 6px;">Willkommen, @${profile.username}</p>
     <p style="color:#666;font-size:12px;margin:0 0 18px;">Folge anderen Profilen oder poste etwas, um deinen Feed zu füllen.</p>
     <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;">
@@ -253,7 +253,7 @@ function _renderFeedCard(post, currentUserId, usernameMap, interactions) {
   const vis = post.visibility || 'public'
   const isOwn = post.user_id === currentUserId
   const visBadge = isOwn && vis !== 'public'
-    ? `<div style="position:absolute;top:6px;left:6px;z-index:3;background:rgba(0,0,0,0.65);border-radius:10px;padding:2px 7px;font-size:10px;color:#ccc;">${vis === 'followers' ? '👥' : '🔒'}</div>`
+    ? `<div style="position:absolute;top:6px;left:6px;z-index:3;background:rgba(0,0,0,0.65);border-radius:10px;padding:2px 7px;font-size:10px;color:#ccc;">${vis === 'followers' ? iconSvg('users', 10) : iconSvg('lock', 10)}</div>`
     : ''
   return `
     <div class="unified-cell" data-post-id="${post.id}">
@@ -269,15 +269,15 @@ function _renderFeedCard(post, currentUserId, usernameMap, interactions) {
         </div>
         <div class="feed-overlay-actions">
           <button class="feed-like-btn" data-post-id="${post.id}" data-liked="${liked}" data-owner-id="${post.user_id}" style="color:${liked ? '#ff4d6d' : '#fff'};">
-            <span class="feed-like-icon">${liked ? '♥' : '♡'}</span>
+            <span class="feed-like-icon">${iconSvg('heart', 14, liked ? 'currentColor' : 'none')}</span>
             <span class="feed-like-count" data-post-id="${post.id}">${lc}</span>
           </button>
           <button class="feed-comment-btn" data-post-id="${post.id}" data-media-url="${escapeHtml(post.media_url)}" data-media-type="${mt}" data-owner-id="${post.user_id}">
-            <span>💬</span>
+            <span>${iconSvg('comment', 14)}</span>
             <span class="feed-comment-count" data-post-id="${post.id}">${cc}</span>
           </button>
           <button class="feed-repost-btn" data-post-id="${post.id}" data-reposted="${reposted}" data-owner-id="${post.user_id}" style="color:${reposted ? '#06d6a0' : '#fff'};">
-            <span>🔁</span>
+            <span>${iconSvg('repost', 14)}</span>
             <span class="feed-repost-count" data-post-id="${post.id}">${rc}</span>
           </button>
         </div>
@@ -347,7 +347,7 @@ async function _handleLike(btn, currentUserId) {
   // Optimistic UI
   btn.dataset.liked = String(!liked)
   btn.style.color = !liked ? '#ff4d6d' : '#555'
-  if (iconEl) iconEl.textContent = !liked ? '♥' : '♡'
+  if (iconEl) iconEl.innerHTML = iconSvg('heart', 14, !liked ? 'currentColor' : 'none')
   if (countEl) countEl.textContent = !liked ? current + 1 : Math.max(0, current - 1)
 
   const { error } = await toggleLike(postId, currentUserId, liked, ownerId)
@@ -355,7 +355,7 @@ async function _handleLike(btn, currentUserId) {
     // Rollback
     btn.dataset.liked = String(liked)
     btn.style.color = liked ? '#ff4d6d' : '#555'
-    if (iconEl) iconEl.textContent = liked ? '♥' : '♡'
+    if (iconEl) iconEl.innerHTML = iconSvg('heart', 14, liked ? 'currentColor' : 'none')
     if (countEl) countEl.textContent = current
   }
 }
@@ -645,9 +645,9 @@ function _composerModalHtml() {
       </div>
       <div class="modal-body">
         <div style="display:flex;gap:6px;margin-bottom:14px;">
-          <button class="post-tab" data-tab="upload" style="padding:6px 14px;border-radius:20px;border:none;background:#fff;color:#000;font-size:12px;font-weight:500;cursor:pointer;">📁 Upload</button>
-          <button class="post-tab" data-tab="url" style="padding:6px 14px;border-radius:20px;border:1px solid #333;background:transparent;color:#aaa;font-size:12px;cursor:pointer;">🔗 URL</button>
-          <button class="post-tab" data-tab="embed" style="padding:6px 14px;border-radius:20px;border:1px solid #333;background:transparent;color:#aaa;font-size:12px;cursor:pointer;">▶️ Embed</button>
+          <button class="post-tab" data-tab="upload" style="padding:6px 14px;border-radius:20px;border:none;background:#fff;color:#000;font-size:12px;font-weight:500;cursor:pointer;">${iconSvg('upload', 14)} Upload</button>
+          <button class="post-tab" data-tab="url" style="padding:6px 14px;border-radius:20px;border:1px solid #333;background:transparent;color:#aaa;font-size:12px;cursor:pointer;">${iconSvg('link', 14)} URL</button>
+          <button class="post-tab" data-tab="embed" style="padding:6px 14px;border-radius:20px;border:1px solid #333;background:transparent;color:#aaa;font-size:12px;cursor:pointer;">${iconSvg('play', 14)} Embed</button>
         </div>
         <div id="tab-upload" style="margin-bottom:12px;">
           <input id="post-file" type="file" accept="image/*,video/*,.gif" style="display:none;" />
@@ -674,9 +674,9 @@ function _composerModalHtml() {
           <input id="post-mood" class="input" type="text" placeholder="mood, vibe, aesthetic..." style="padding-left:24px;" />
         </div>
         <div style="display:flex;gap:6px;margin-bottom:6px;">
-          <button class="vis-btn" data-vis="public" style="padding:5px 12px;border-radius:20px;border:none;background:#fff;color:#000;font-size:12px;font-weight:500;cursor:pointer;">🌍 Alle</button>
-          <button class="vis-btn" data-vis="followers" style="padding:5px 12px;border-radius:20px;border:1px solid #333;background:transparent;color:#aaa;font-size:12px;cursor:pointer;">👥 Follower</button>
-          <button class="vis-btn" data-vis="private" style="padding:5px 12px;border-radius:20px;border:1px solid #333;background:transparent;color:#aaa;font-size:12px;cursor:pointer;">🔒 Nur ich</button>
+          <button class="vis-btn" data-vis="public" style="padding:5px 12px;border-radius:20px;border:none;background:#fff;color:#000;font-size:12px;font-weight:500;cursor:pointer;">${iconSvg('globe', 14)} Alle</button>
+          <button class="vis-btn" data-vis="followers" style="padding:5px 12px;border-radius:20px;border:1px solid #333;background:transparent;color:#aaa;font-size:12px;cursor:pointer;">${iconSvg('users', 14)} Follower</button>
+          <button class="vis-btn" data-vis="private" style="padding:5px 12px;border-radius:20px;border:1px solid #333;background:transparent;color:#aaa;font-size:12px;cursor:pointer;">${iconSvg('lock', 14)} Nur ich</button>
         </div>
       </div>
       <div class="modal-foot">
@@ -811,7 +811,7 @@ export function openRepostModal(boards, onConfirm) {
   const boardOptionsHtml = selectableBoards.length
     ? `<div style="max-height:32vh;overflow-y:auto;margin-bottom:10px;">
          <button type="button" class="repost-board-pick selected" data-board-id="" style="display:block;width:100%;text-align:left;padding:10px 12px;margin-bottom:6px;background:#222;border:1px solid #fff;border-radius:8px;color:#fff;font-size:13px;cursor:pointer;">Nur "Reposts"-Board</button>
-         ${selectableBoards.map(b => `<button type="button" class="repost-board-pick" data-board-id="${b.id}" style="display:block;width:100%;text-align:left;padding:10px 12px;margin-bottom:6px;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:8px;color:#ddd;font-size:13px;cursor:pointer;">+ ${escapeHtml(b.title)} ${b.visibility === 'private' ? '🔒' : b.visibility === 'followers' ? '👥' : ''}</button>`).join('')}
+         ${selectableBoards.map(b => `<button type="button" class="repost-board-pick" data-board-id="${b.id}" style="display:block;width:100%;text-align:left;padding:10px 12px;margin-bottom:6px;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:8px;color:#ddd;font-size:13px;cursor:pointer;">+ ${escapeHtml(b.title)} ${b.visibility === 'private' ? iconSvg('lock', 12) : b.visibility === 'followers' ? iconSvg('users', 12) : ''}</button>`).join('')}
        </div>`
     : `<p style="color:#666;font-size:12px;margin:0 0 12px;">Wird in dein automatisches "Reposts"-Board gelegt.</p>`
   modal.innerHTML = `
@@ -899,7 +899,10 @@ async function _renderNotifications(currentUserId) {
   list.innerHTML = notifs.map(n => {
     const actor = n.senderUsername ? `@${n.senderUsername}` : 'Jemand'
     const isFollowReq = n.type === 'follow_request'
-    const icon = n.type === 'like' ? '♥' : n.type === 'comment' ? '💬' : n.type === 'repost' ? '🔁' : isFollowReq ? '👤' : '👤'
+    let iconSvgStr = iconSvg('mood', 14)
+    if (n.type === 'like') iconSvgStr = iconSvg('heart', 14, 'currentColor')
+    else if (n.type === 'comment') iconSvgStr = iconSvg('comment', 14)
+    else if (n.type === 'repost') iconSvgStr = iconSvg('repost', 14)
     const iconColor = n.type === 'like' ? '#ff4d6d' : n.type === 'comment' ? '#4d9fff' : n.type === 'repost' ? '#06d6a0' : '#aaa'
     const text = n.type === 'like'
       ? 'hat deinen Post geliked'
@@ -919,7 +922,7 @@ async function _renderNotifications(currentUserId) {
         </div>`
       : ''
     return `<div data-notif-id="${n.id}" style="padding:12px 16px;border-bottom:1px solid #1a1a1a;display:flex;align-items:flex-start;gap:10px;background:${unread ? '#141414' : 'transparent'};">
-      <span style="font-size:14px;color:${iconColor};flex-shrink:0;margin-top:1px;">${icon}</span>
+      <span style="font-size:14px;color:${iconColor};flex-shrink:0;margin-top:1px;display:inline-flex;align-items:center;">${iconSvgStr}</span>
       <div style="flex:1;min-width:0;">
         <span style="font-size:13px;color:${unread ? '#ddd' : '#666'};"><strong style="color:${unread ? '#fff' : '#888'}">${actor}</strong> ${text}</span>
         <div style="font-size:11px;color:#444;margin-top:2px;">${timeAgo(n.created_at)}</div>

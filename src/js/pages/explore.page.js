@@ -63,12 +63,12 @@ export async function showExplorePage(profile, nav) {
     <!-- NEU: Discovery-Kacheln -->
     <div class="discovery-tiles">
       <button class="discovery-tile" data-discovery="personal">
-        <div class="discovery-tile-icon">✨</div>
+        <div class="discovery-tile-icon">${iconSvg('spark', 16)}</div>
         <div class="discovery-tile-content">
           <div class="discovery-tile-title">Für dich</div>
           <div class="discovery-tile-desc">Beiträge, die zu dir passen</div>
         </div>
-        <div class="discovery-tile-chev">›</div>
+        <div class="discovery-tile-chev">${iconSvg('chevR', 14)}</div>
       </button>
       <button class="discovery-tile" data-discovery="boards">
         <div class="discovery-tile-icon discovery-tile-icon--boards">
@@ -88,7 +88,7 @@ export async function showExplorePage(profile, nav) {
           <div class="discovery-tile-title">Board-Vorschläge</div>
           <div class="discovery-tile-desc">Entdecke neue Boards</div>
         </div>
-        <div class="discovery-tile-chev">›</div>
+        <div class="discovery-tile-chev">${iconSvg('chevR', 14)}</div>
       </button>
     </div>
 
@@ -138,7 +138,7 @@ export async function showExplorePage(profile, nav) {
     if (type === 'personal') {
       // TODO: Personalisierten Feed laden (Algorithmus Phase 9/10)
       tile.classList.toggle('discovery-tile--active');
-      document.querySelector('#explore-grid').innerHTML = '<div class="feed-state">✨ Personalisierte Ansicht – kommt bald!</div>';
+      document.querySelector('#explore-grid').innerHTML = `<div class="feed-state">${iconSvg('spark', 16)} Personalisierte Ansicht – kommt bald!</div>`;
     } else if (type === 'boards') {
       // TODO: Board-Vorschläge laden
       window.location.hash = '#/boards/suggested';
@@ -242,7 +242,7 @@ async function _loadExploreGrid(profile, nav, reset) {
   if (error) {
     if (reset) grid.innerHTML = ''
     state.style.display = 'block'
-    state.innerHTML = `<div style="font-size:28px;margin-bottom:10px;">😶</div><p>Konnte Explore nicht laden.</p>`
+    state.innerHTML = `<div style="font-size:28px;margin-bottom:10px;">${iconSvg('mood', 28)}</div><p>Konnte Explore nicht laden.</p>`
     return
   }
 
@@ -250,8 +250,8 @@ async function _loadExploreGrid(profile, nav, reset) {
     grid.innerHTML = ''
     state.style.display = 'block'
     state.innerHTML = exploreMood
-      ? `<div style="font-size:28px;margin-bottom:10px;">🌫️</div><p style="color:#555;">Keine öffentlichen Posts mit #${exploreMood}.</p>`
-      : `<div style="font-size:28px;margin-bottom:10px;">🌱</div><p style="color:#555;">Noch keine öffentlichen Posts zum Entdecken.</p>`
+      ? `<div style="font-size:28px;margin-bottom:10px;">${iconSvg('volume', 28)}</div><p style="color:#555;">Keine öffentlichen Posts mit #${exploreMood}.</p>`
+      : `<div style="font-size:28px;margin-bottom:10px;">${iconSvg('plant', 28)}</div><p style="color:#555;">Noch keine öffentlichen Posts zum Entdecken.</p>`
     return
   }
 
@@ -303,7 +303,7 @@ function _renderExploreCard(post, currentUserId, usernameMap, interactions) {
   }
 
   const muteBtn = isVideo
-    ? `<button class="explore-mute-btn" data-muted="1" title="Ton umschalten">🔇</button>`
+    ? `<button class="explore-mute-btn" data-muted="1" title="Ton umschalten">${iconSvg('volume', 14)}</button>`
     : ''
 
   return `
@@ -316,8 +316,8 @@ function _renderExploreCard(post, currentUserId, usernameMap, interactions) {
         <div style="display:flex;align-items:center;justify-content:space-between;">
           <span class="explore-username" data-username="${username}" style="font-size:11px;color:rgba(255,255,255,0.85);pointer-events:all;cursor:pointer;max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">@${username}</span>
           <div style="display:flex;gap:6px;align-items:center;">
-            <span style="font-size:11px;color:rgba(255,255,255,0.7);">♥ ${lc}</span>
-            <span style="font-size:11px;color:rgba(255,255,255,0.7);">💬 ${cc}</span>
+            <span style="font-size:11px;color:rgba(255,255,255,0.7);display:inline-flex;align-items:center;gap:2px;">${iconSvg('heart', 11)} ${lc}</span>
+            <span style="font-size:11px;color:rgba(255,255,255,0.7);display:inline-flex;align-items:center;gap:2px;">${iconSvg('comment', 11)} ${cc}</span>
           </div>
         </div>
         ${post.mood ? `<span class="explore-mood-tag" data-mood="${post.mood}" style="font-size:10px;color:rgba(255,255,255,0.5);margin-top:3px;pointer-events:all;cursor:pointer;">#${post.mood}</span>` : ''}
@@ -325,15 +325,15 @@ function _renderExploreCard(post, currentUserId, usernameMap, interactions) {
       <!-- Action Bar (immer sichtbar auf Mobile) -->
       <div class="explore-actions" style="position:absolute;bottom:0;left:0;right:0;z-index:3;display:flex;align-items:center;gap:2px;padding:4px 6px;background:rgba(0,0,0,0.6);">
         <button class="explore-like-btn" data-post-id="${post.id}" data-liked="${liked}" data-owner-id="${post.user_id}" style="display:flex;align-items:center;gap:2px;background:none;border:none;cursor:pointer;color:${liked ? '#ff4d6d' : '#888'};font-size:11px;padding:3px 4px;border-radius:4px;flex:1;justify-content:center;">
-          <span class="explore-like-icon" style="font-size:13px;">${liked ? '♥' : '♡'}</span>
+          <span class="explore-like-icon" style="display:inline-flex;align-items:center;">${iconSvg('heart', 13, liked ? 'currentColor' : 'none')}</span>
           <span class="explore-like-count" data-post-id="${post.id}">${lc}</span>
         </button>
         <button class="explore-comment-btn" data-post-id="${post.id}" data-media-url="${escapeHtml(post.media_url || '')}" data-media-type="${mt}" data-owner-id="${post.user_id}" style="display:flex;align-items:center;gap:2px;background:none;border:none;cursor:pointer;color:#888;font-size:11px;padding:3px 4px;border-radius:4px;flex:1;justify-content:center;">
-          <span style="font-size:13px;">💬</span>
+          <span style="display:inline-flex;align-items:center;">${iconSvg('comment', 13)}</span>
           <span class="explore-comment-count" data-post-id="${post.id}">${cc}</span>
         </button>
         <button class="explore-repost-btn" data-post-id="${post.id}" data-reposted="${reposted}" data-owner-id="${post.user_id}" style="display:flex;align-items:center;gap:2px;background:none;border:none;cursor:pointer;color:${reposted ? '#06d6a0' : '#888'};font-size:11px;padding:3px 4px;border-radius:4px;flex:1;justify-content:center;">
-          <span style="font-size:13px;">🔁</span>
+          <span style="display:inline-flex;align-items:center;">${iconSvg('repost', 13)}</span>
           <span class="explore-repost-count" data-post-id="${post.id}">${rc}</span>
         </button>
       </div>
@@ -376,7 +376,7 @@ function _wireExploreActions(profile, nav) {
       const nowMuted = btn.dataset.muted === '1'
       v.muted = !nowMuted
       btn.dataset.muted = nowMuted ? '0' : '1'
-      btn.textContent = nowMuted ? '🔊' : '🔇'
+      btn.innerHTML = nowMuted ? iconSvg('volume', 14) : iconSvg('volume', 14)
     })
   })
 
@@ -442,7 +442,7 @@ async function _handleExploreLike(btn, currentUserId) {
   // Optimistic UI
   btn.dataset.liked = String(!liked)
   btn.style.color = !liked ? '#ff4d6d' : '#888'
-  if (iconEl) iconEl.textContent = !liked ? '♥' : '♡'
+  if (iconEl) iconEl.innerHTML = iconSvg('heart', 13, !liked ? 'currentColor' : 'none')
   if (countEl) countEl.textContent = !liked ? current + 1 : Math.max(0, current - 1)
 
   const { error } = await toggleLike(postId, currentUserId, liked, ownerId)
@@ -450,7 +450,7 @@ async function _handleExploreLike(btn, currentUserId) {
     // Rollback
     btn.dataset.liked = String(liked)
     btn.style.color = liked ? '#ff4d6d' : '#888'
-    if (iconEl) iconEl.textContent = liked ? '♥' : '♡'
+    if (iconEl) iconEl.innerHTML = iconSvg('heart', 13, liked ? 'currentColor' : 'none')
     if (countEl) countEl.textContent = current
   } else if (!liked && ownerId) {
     notifyAction(ownerId, currentUserId, 'like').catch(() => {})

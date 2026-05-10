@@ -60,7 +60,7 @@ export async function showProfilePage(username, ctx) {
 
   if (iAmBlocked) {
     updateShellContent(`<div style="background:#0a0a0a;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:24px;">
-      <div style="font-size:42px;">🚫</div>
+      <div style="font-size:42px;">${iconSvg('ban', 42)}</div>
       <p style="color:#555;font-size:14px;text-align:center;">Profil nicht verfügbar.</p>
       <button onclick="history.back()" style="padding:8px 20px;background:transparent;color:#666;border:1px solid #333;border-radius:8px;cursor:pointer;font-size:13px;">Zurück</button>
     </div>`)
@@ -145,13 +145,13 @@ export async function showProfilePage(username, ctx) {
           <div style="min-width:0;">
             <div style="font-size:22px;font-weight:700;color:${heroTextColor};text-shadow:${heroTextShadow};">${escapeHtml(profile.display_name || profile.username)}</div>
             ${profile.bio ? `<div style="font-size:13px;color:${heroBioColor};margin-top:6px;line-height:1.4;text-shadow:${heroTextShadow};">${escapeHtml(profile.bio)}</div>` : ''}
-            ${profilePrivacy !== 'public' ? `<div style="margin-top:8px;font-size:11px;color:${heroPrivacyColor};">${profilePrivacy === 'private' ? '🔒 Privates Profil' : '👥 Nur Follower'}</div>` : ''}
+            ${profilePrivacy !== 'public' ? `<div style="margin-top:8px;font-size:11px;color:${heroPrivacyColor};">${profilePrivacy === 'private' ? iconSvg('lock', 11) + ' Privates Profil' : iconSvg('users', 11) + ' Nur Follower'}</div>` : ''}
           </div>
         </div>
         <button id="btn-info" style="position:absolute;bottom:20px;left:16px;z-index:2;padding:6px 14px;background:${heroBtnBg};color:${heroBtnColor};border:1px solid ${heroBtnBorder};border-radius:20px;cursor:pointer;font-size:12px;backdrop-filter:blur(8px);">
           @${profile.username} · ${boardPosts.length} Posts · ${followerCount} Follower
         </button>
-        ${profile.playlist_url ? `<button id="btn-music" style="position:absolute;bottom:20px;right:16px;z-index:2;width:42px;height:42px;background:${heroBtnBg};color:${heroBtnColor};border:1px solid ${heroBtnBorder};border-radius:50%;cursor:pointer;font-size:20px;backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;">🎵</button>` : ''}
+        ${profile.playlist_url ? `<button id="btn-music" style="position:absolute;bottom:20px;right:16px;z-index:2;width:42px;height:42px;background:${heroBtnBg};color:${heroBtnColor};border:1px solid ${heroBtnBorder};border-radius:50%;cursor:pointer;backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;">${iconSvg('music', 20)}</button>` : ''}
       </div>
 
       <!-- Info Panel -->
@@ -161,7 +161,7 @@ export async function showProfilePage(username, ctx) {
           <span><strong style="color:#fff;">${followerCount}</strong> Follower</span>
           <span><strong style="color:#fff;">${followingCount}</strong> Following</span>
         </div>
-        ${profile.profile_link ? `<a href="${escapeHtml(profile.profile_link)}" target="_blank" rel="noopener" style="display:inline-block;margin-top:8px;font-size:12px;color:#4d9fff;text-decoration:none;">🔗 ${escapeHtml(profile.profile_link)}</a>` : ''}
+        ${profile.profile_link ? `<a href="${escapeHtml(profile.profile_link)}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:4px;margin-top:8px;font-size:12px;color:#4d9fff;text-decoration:none;">${iconSvg('link', 12)} ${escapeHtml(profile.profile_link)}</a>` : ''}
       </div>
 
       <!-- Musik Panel -->
@@ -169,7 +169,7 @@ export async function showProfilePage(username, ctx) {
 
       ${!canSeeBoard ? `
         <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:80px 20px;gap:16px;">
-          <div style="font-size:48px;">🔒</div>
+          <div style="font-size:48px;">${iconSvg('lock', 48)}</div>
           <p style="color:#555;font-size:14px;text-align:center;max-width:280px;">${
             followState === 'pending'
               ? 'Deine Anfrage ist ausstehend. Sobald sie angenommen wird, siehst du dieses Profil.'
@@ -185,7 +185,7 @@ export async function showProfilePage(username, ctx) {
           <div style="display:flex;overflow-x:auto;scrollbar-width:none;padding:0 12px;">
             <button class="board-tab active-board-tab" data-board="all" style="padding:12px 16px;background:none;border:none;border-bottom:2px solid #fff;color:#fff;font-size:13px;cursor:pointer;white-space:nowrap;flex-shrink:0;">Alle Posts</button>
             ${boards.map(b => {
-              const visIcon = b.visibility === 'private' ? ' 🔒' : b.visibility === 'followers' ? ' 👥' : ''
+              const visIcon = b.visibility === 'private' ? ' ' + iconSvg('lock', 12) : b.visibility === 'followers' ? ' ' + iconSvg('users', 12) : ''
               return `<button class="board-tab" data-board="${b.id}" style="padding:12px 16px;background:none;border:none;border-bottom:2px solid transparent;color:#555;font-size:13px;cursor:pointer;white-space:nowrap;flex-shrink:0;">${escapeHtml(b.title)}${visIcon}</button>`
             }).join('')}
             ${isOwner ? `<button id="btn-new-board" style="padding:12px 16px;background:none;border:none;border-bottom:2px solid transparent;color:#444;font-size:13px;cursor:pointer;white-space:nowrap;flex-shrink:0;">+ Board</button>` : ''}
@@ -222,7 +222,7 @@ export async function showProfilePage(username, ctx) {
         <div style="display:flex;gap:8px;margin-bottom:8px;">
           ${['public', 'followers', 'private'].map(v => `
             <button class="privacy-btn" data-privacy="${v}" style="flex:1;padding:12px 8px;border-radius:10px;border:2px solid ${profilePrivacy === v ? '#fff' : '#2a2a2a'};background:${profilePrivacy === v ? '#fff' : '#1a1a1a'};color:${profilePrivacy === v ? '#000' : '#555'};cursor:pointer;font-size:13px;text-align:center;line-height:1.4;">
-              ${v === 'public' ? '🌍' : v === 'followers' ? '👥' : '🔒'}<br><span style="font-size:11px;">${v === 'public' ? 'Öffentlich' : v === 'followers' ? 'Follower' : 'Privat'}</span>
+              ${v === 'public' ? iconSvg('globe', 14) : v === 'followers' ? iconSvg('users', 14) : iconSvg('lock', 14)}<br><span style="font-size:11px;">${v === 'public' ? 'Öffentlich' : v === 'followers' ? 'Follower' : 'Privat'}</span>
             </button>`).join('')}
         </div>
         <p style="color:#444;font-size:11px;margin-bottom:24px;">Öffentlich = alle sehen dein Board · Follower = nur wer dir folgt · Privat = nur du</p>
@@ -268,7 +268,7 @@ export async function showProfilePage(username, ctx) {
               : `<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#444;font-size:13px;">Noch kein Foto</div>`}
           </div>
           <input id="header-file" type="file" accept="image/*" style="display:none;" />
-          <button id="btn-upload" style="width:100%;padding:10px;background:#1a1a1a;color:#888;border:1px solid #2a2a2a;border-radius:8px;cursor:pointer;font-size:13px;margin-bottom:10px;">📷 Foto auswählen</button>
+          <button id="btn-upload" style="width:100%;padding:10px;background:#1a1a1a;color:#888;border:1px solid #2a2a2a;border-radius:8px;cursor:pointer;font-size:13px;margin-bottom:10px;display:inline-flex;align-items:center;justify-content:center;gap:6px;">${iconSvg('upload', 14)} Foto auswählen</button>
           <div style="display:flex;align-items:center;gap:10px;">
             <span style="color:#555;font-size:11px;white-space:nowrap;">Zoom:</span>
             <input type="range" id="zoom-slider" min="1" max="3" step="0.05" value="${profile.header_image_position?.zoom || 1}" style="flex:1;accent-color:#fff;" />
@@ -298,9 +298,9 @@ export async function showProfilePage(username, ctx) {
         <input id="board-playlist" type="url" placeholder="Spotify / YouTube..." style="display:block;width:100%;padding:10px 12px;margin-bottom:14px;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:8px;color:#fff;font-size:14px;box-sizing:border-box;outline:none;" />
         <label style="display:block;color:#666;font-size:11px;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;">Sichtbarkeit</label>
         <div style="display:flex;gap:6px;margin-bottom:20px;">
-          <button class="board-vis-btn" data-vis="public" style="flex:1;padding:8px 4px;border-radius:8px;border:2px solid #fff;background:#fff;color:#000;font-size:11px;cursor:pointer;text-align:center;">🌍<br>Öffentlich</button>
-          <button class="board-vis-btn" data-vis="followers" style="flex:1;padding:8px 4px;border-radius:8px;border:2px solid #2a2a2a;background:#1a1a1a;color:#555;font-size:11px;cursor:pointer;text-align:center;">👥<br>Follower</button>
-          <button class="board-vis-btn" data-vis="private" style="flex:1;padding:8px 4px;border-radius:8px;border:2px solid #2a2a2a;background:#1a1a1a;color:#555;font-size:11px;cursor:pointer;text-align:center;">🔒<br>Privat</button>
+          <button class="board-vis-btn" data-vis="public" style="flex:1;padding:8px 4px;border-radius:8px;border:2px solid #fff;background:#fff;color:#000;font-size:11px;cursor:pointer;text-align:center;">${iconSvg('globe', 14)}<br>Öffentlich</button>
+          <button class="board-vis-btn" data-vis="followers" style="flex:1;padding:8px 4px;border-radius:8px;border:2px solid #2a2a2a;background:#1a1a1a;color:#555;font-size:11px;cursor:pointer;text-align:center;">${iconSvg('users', 14)}<br>Follower</button>
+          <button class="board-vis-btn" data-vis="private" style="flex:1;padding:8px 4px;border-radius:8px;border:2px solid #2a2a2a;background:#1a1a1a;color:#555;font-size:11px;cursor:pointer;text-align:center;">${iconSvg('lock', 14)}<br>Privat</button>
         </div>
         <button id="board-save" style="width:100%;padding:12px;background:#fff;color:#000;border:none;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;">Board erstellen</button>
         <p id="board-msg" style="color:#555;font-size:12px;text-align:center;margin-top:10px;min-height:16px;"></p>

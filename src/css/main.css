@@ -1,3 +1,6 @@
+/* ─── Font Import ──────────────────────────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
 /* ─── Design tokens ─────────────────────────────────────────── */
 :root {
   --bg: #050505;
@@ -16,7 +19,7 @@
   --radius-md: 12px;
   --radius-sm: 8px;
   --shadow-elev: 0 20px 50px rgba(0,0,0,.6);
-  --font: "DM Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -275,8 +278,12 @@ body.has-global-header.profile-page .app-main { padding-top: 0; }
   flex-shrink: 0;
 }
 .gh-center {
-  flex: 1; min-width: 0;
-  display: flex; align-items: center; justify-content: center;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  max-width: 400px;
+  margin: 0 auto;
 }
 .gh-right {
   display: flex; align-items: center; gap: 4px;
@@ -373,7 +380,8 @@ body.has-global-header.profile-page .app-main { padding-top: 0; }
 /* ── Search ── */
 .gh-search-wrap {
   position: relative;
-  width: 100%; max-width: 320px;
+  width: 100%;
+  max-width: 320px;
 }
 .gh-search-icon {
   position: absolute; left: 10px; top: 50%;
