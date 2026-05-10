@@ -33,12 +33,12 @@ export async function showFeed(profile, ctx) {
   updateActiveNav('home')
   updateShellContent(`
     <!-- Notif Dropdown (global, außerhalb topbar) -->
-    <div id="notif-dropdown" style="display:none;position:fixed;right:12px;top:60px;width:320px;background:var(--panel);border:1px solid var(--border);border-radius:var(--radius-md);overflow:hidden;z-index:110;box-shadow:var(--shadow-elev);backdrop-filter:blur(24px);">
+    <div id="notif-dropdown" style="display:none;position:fixed;right:12px;top:60px;width:360px;background:var(--panel);border:1px solid var(--border);border-radius:var(--radius-md);overflow:hidden;z-index:110;box-shadow:var(--shadow-elev);backdrop-filter:blur(24px);">
       <div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;">
         <span style="font-size:13px;font-weight:600;color:#fff;">Benachrichtigungen</span>
         <button id="notif-mark-read" style="background:none;border:none;cursor:pointer;font-size:11px;color:var(--text-mute);">Alle gelesen</button>
       </div>
-      <div id="notif-list" style="max-height:340px;overflow-y:auto;"></div>
+      <div id="notif-list" style="max-height:min(340px, 50vh);overflow-y:auto;"></div>
     </div>
 
     <div id="story-bar" style="display:flex;gap:12px;padding:14px 16px;overflow-x:auto;border-bottom:1px solid var(--border);scrollbar-width:none;-webkit-overflow-scrolling:touch;"></div>

@@ -386,6 +386,8 @@ body.has-global-header.profile-page .app-main { padding-top: 0; }
   box-shadow: var(--shadow-elev);
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
+  max-height: min(400px, 60vh);
+  overflow-y: auto;
 }
 
 
@@ -830,6 +832,8 @@ input::placeholder, textarea::placeholder { color: rgba(255,255,255,.35); }
   background: var(--panel);
   backdrop-filter: blur(24px);
   box-shadow: 0 20px 50px rgba(0,0,0,.6);
+  max-height: min(480px, 80vh);
+  overflow-y: auto;
 }
 
 .filter-popup.show {
@@ -1004,5 +1008,6 @@ input::placeholder, textarea::placeholder { color: rgba(255,255,255,.35); }
   .filter-popup {
     width: 240px;
     bottom: 72px;
+    max-height: min(360px, 80vh);
   }
 }

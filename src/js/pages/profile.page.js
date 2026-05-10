@@ -205,8 +205,8 @@ export async function showProfilePage(username, ctx) {
       </div>
 
     <!-- Edit Modal -->
-    <div id="edit-modal" style="display:none;position:fixed;inset:0;z-index:200;background:rgba(0,0,0,0.92);overflow-y:auto;">
-      <div style="max-width:500px;margin:0 auto;padding:24px 16px 80px;">
+    <div id="edit-modal" style="display:none;position:fixed;inset:0;z-index:200;background:rgba(0,0,0,0.92);align-items:center;justify-content:center;">
+      <div style="max-width:500px;width:calc(100% - 32px);max-height:85vh;overflow-y:auto;background:#111;border:1px solid #222;border-radius:16px;padding:24px;margin:16px;box-sizing:border-box;">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;">
           <h2 style="color:#fff;font-size:18px;font-weight:500;margin:0;">Profil editieren</h2>
           <button id="edit-close" style="background:none;border:none;color:#555;font-size:22px;cursor:pointer;">×</button>
@@ -494,13 +494,22 @@ export async function showProfilePage(username, ctx) {
   let currentPrivacy = profilePrivacy
 
   document.querySelector('#btn-edit')?.addEventListener('click', () => {
-    document.querySelector('#edit-modal').style.display = 'block'
+    document.querySelector('#edit-modal').style.display = 'flex'
+    document.body.classList.add('no-scroll')
   })
   document.querySelector('#edit-close')?.addEventListener('click', () => {
     document.querySelector('#edit-modal').style.display = 'none'
+    document.body.classList.remove('no-scroll')
+  })
+  document.querySelector('#edit-modal')?.addEventListener('click', (e) => {
+    if (e.target === document.querySelector('#edit-modal')) {
+      document.querySelector('#edit-modal').style.display = 'none'
+      document.body.classList.remove('no-scroll')
+    }
   })
   if (isOwner && new URLSearchParams(location.search).get('edit') === '1') {
-    document.querySelector('#edit-modal').style.display = 'block'
+    document.querySelector('#edit-modal').style.display = 'flex'
+    document.body.classList.add('no-scroll')
     history.replaceState({}, '', '/u/' + profile.username)
   }
 
