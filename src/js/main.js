@@ -63,7 +63,7 @@ registerHandlers({
   init,
 
   async profile(username) {
-    await showProfilePage(username, { navigate })
+    await showProfilePage(username, getNavCallbacks())
   },
 
   async explore() {

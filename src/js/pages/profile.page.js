@@ -12,7 +12,7 @@ import { openStoryViewer, openRepostModal } from './feed.page.js'
 import { initGridCols } from '../grid-utils.js'
 import { renderGridControls } from '../grid-controls.js'
 import { escapeHtml, shuffleArray, buildHeaderStyle, buildPatternStyle, buildMusicEmbed, iconSvg, profileHeaderTone } from '../utils.js'
-import { renderGlobalHeader, setGlobalHeaderTone, registerHeaderScrollListener } from '../shell.js'
+import { shellHtml, wireShellNav, applyNavPref, renderGlobalHeader, setGlobalHeaderTone, registerHeaderScrollListener } from '../shell.js'
 
 /**
  * Zeigt eine Profilseite.
@@ -25,6 +25,7 @@ export async function showProfilePage(username, ctx) {
 
   // Body-Klassen für globalen Header
   document.body.classList.add('has-global-header', 'profile-page')
+  applyNavPref()
 
   app.innerHTML = `<div style="background:#0a0a0a;min-height:100vh;display:flex;align-items:center;justify-content:center;color:#444;font-size:14px;">Lädt...</div>`
 
@@ -125,7 +126,10 @@ export async function showProfilePage(username, ctx) {
   const heroBtnBorder = tone === 'light' ? 'rgba(0,0,0,0.15)' : 'rgba(255,255,255,0.2)'
 
   app.innerHTML = `
-    <div style="background:#0a0a0a;min-height:100vh;color:#fff;">
+    <div class="app-shell">
+      ${shellHtml('profile', profile)}
+      <main class="app-main">
+        <div style="background:#0a0a0a;min-height:100vh;color:#fff;">
 
       <!-- Hero Header (kein padding-top — globaler Header überlagert) -->
       <div style="position:relative;width:100%;height:300px;overflow:hidden;${headerStyle}">
@@ -211,6 +215,8 @@ export async function showProfilePage(username, ctx) {
           </div>
         </div>
       `}
+      </div>
+    </main>
     </div>
 
     <!-- Edit Modal -->
@@ -321,6 +327,13 @@ export async function showProfilePage(username, ctx) {
   renderGlobalHeader(profile, { navigate }, {
     tone,
     showBack: true,
+  })
+
+  // ── Shell-Navigation verdrahten (Sidebar + Bottombar) ────────────────────────
+  wireShellNav(profile, {
+    navigate: ctx.navigate,
+    openComposer: ctx.openComposer,
+    toggleNotif: ctx.toggleNotif,
   })
 
   // Scroll-Listener: Header-Tone dynamisch anpassen
