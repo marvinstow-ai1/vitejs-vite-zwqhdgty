@@ -319,7 +319,7 @@ export async function showProfilePage(username, ctx) {
   updateGlobalHeader({
     tone,
     showSearch: true,
-    showBack: true,
+    showBack: false,
     profileActions: profileActionsHtml,
     profile,
   })
@@ -331,19 +331,21 @@ export async function showProfilePage(username, ctx) {
     toggleNotif: ctx.toggleNotif,
   })
 
-  // Scroll-Listener: Header-Tone dynamisch anpassen
-  // Wenn der Hero-Bereich verlassen wird → 'auto' (Standard-Glasmorphismus)
-  const heroEl = document.querySelector('#app-main').querySelector('div[style*="height:300px"]')
-  const _onProfileScroll = () => {
-    const heroBottom = heroEl ? heroEl.getBoundingClientRect().bottom : 0
-    if (heroBottom <= 52) {
+  // Scroll-Listener für Header-Transition
+  const handleScroll = () => {
+    const scrollY = window.scrollY || window.pageYOffset
+    const heroHeight = 200 // Höhe des Hero-Headers
+
+    if (scrollY > heroHeight - 52) {
+      // Gescrollt → Standard-Tone (Glasmorphismus)
       setGlobalHeaderTone('auto')
     } else {
+      // Wieder oben → Profil-Tone (light/dark)
       setGlobalHeaderTone(tone)
     }
   }
   // Registriert und entfernt automatisch beim nächsten Seitenwechsel
-  registerHeaderScrollListener(_onProfileScroll)
+  registerHeaderScrollListener(handleScroll)
   // Initial setzen
   setGlobalHeaderTone(tone)
 
