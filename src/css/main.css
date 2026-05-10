@@ -194,10 +194,10 @@ body.has-global-header.profile-page .app-main { padding-top: 0; }
  *   --light : Leicht getönt, dunkle Schrift — Profil mit hellem Header
  */
 .global-header {
-  position: relative;
+  position: fixed;
+  top: 0; left: 0; right: 0;
   z-index: 100;
   height: 52px;
-  min-height: 200px;
   display: flex; align-items: center;
   padding: 0 12px;
   gap: 8px;
@@ -206,11 +206,11 @@ body.has-global-header.profile-page .app-main { padding-top: 0; }
 }
 
 .gh-background {
-  position: absolute;
+  position: fixed;
   top: 0; left: 0; right: 0;
   height: 200px;
   overflow: hidden;
-  z-index: -1;
+  z-index: 99;
 }
 
 .gh-background img {

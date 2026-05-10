@@ -407,19 +407,16 @@ export function updateShellContent(html) {
   const main = document.querySelector('#app-main')
   if (!main) return
 
-  // Fade out
-  main.style.opacity = '0'
-  main.style.transform = 'translateY(8px)'
+  // Transition-Klasse setzen (sofortiger visueller Fade-out)
+  main.classList.add('app-main-transitioning')
 
-  setTimeout(() => {
-    main.innerHTML = html
-    // Fade in
-    requestAnimationFrame(() => {
-      main.style.transition = 'opacity .25s ease, transform .25s ease'
-      main.style.opacity = '1'
-      main.style.transform = 'translateY(0)'
-    })
-  }, 150)
+  // DOM SOFORT setzen (kein setTimeout!)
+  main.innerHTML = html
+
+  // Nach einem Frame die Transition rückgängig machen → Fade-in
+  requestAnimationFrame(() => {
+    main.classList.remove('app-main-transitioning')
+  })
 }
 
 /**
