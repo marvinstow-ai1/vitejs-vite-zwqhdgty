@@ -331,23 +331,24 @@ export async function showProfilePage(username, ctx) {
     toggleNotif: ctx.toggleNotif,
   })
 
-  // Scroll-Listener für Header-Transition
+  // Scroll-Listener für Header-Transition (reverset: runter = Glasmo, hoch = Profil-Tone)
   const handleScroll = () => {
     const scrollY = window.scrollY || window.pageYOffset
     const heroHeight = 200 // Höhe des Hero-Headers
+    const scrolled = scrollY > heroHeight - 52
 
-    if (scrollY > heroHeight - 52) {
-      // Gescrollt → Standard-Tone (Glasmorphismus)
-      setGlobalHeaderTone('auto')
+    if (scrolled) {
+      // Gescrollt → Standard-Tone (Glasmorphismus) + gh-scrolled für mehr Opazität
+      setGlobalHeaderTone('auto', true)
     } else {
-      // Wieder oben → Profil-Tone (light/dark)
-      setGlobalHeaderTone(tone)
+      // Wieder oben → Profil-Tone (light/dark) ohne gh-scrolled
+      setGlobalHeaderTone(tone, false)
     }
   }
   // Registriert und entfernt automatisch beim nächsten Seitenwechsel
   registerHeaderScrollListener(handleScroll)
-  // Initial setzen
-  setGlobalHeaderTone(tone)
+  // Initial setzen (Profil-Tone, nicht gescrollt)
+  setGlobalHeaderTone(tone, false)
 
   // ── Basic Listeners ──────────────────────────────────────────────────────────
   document.querySelector('#btn-settings-link')?.addEventListener('click', () => openSettingsModal(profile, ctx))

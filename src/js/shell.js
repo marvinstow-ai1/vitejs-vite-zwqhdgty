@@ -213,11 +213,12 @@ export function refreshGlobalHeaderBadge(count = 0) {
 /**
  * Setzt den Tone des globalen Headers (z.B. nach Scroll-Event auf Profilseite).
  * @param {'light'|'dark'|'auto'} tone
+ * @param {boolean} [scrolled=false] - ob die gh-scrolled-Klasse gesetzt werden soll
  */
-export function setGlobalHeaderTone(tone) {
+export function setGlobalHeaderTone(tone, scrolled = false) {
   const el = document.querySelector('#global-header')
   if (!el) return
-  el.className = `global-header global-header--${tone}`
+  el.className = `global-header global-header--${tone}${scrolled ? ' gh-scrolled' : ''}`
   el.dataset.tone = tone
 }
 
