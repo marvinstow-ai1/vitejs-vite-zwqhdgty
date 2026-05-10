@@ -7,100 +7,116 @@ import { signOut } from '../services/auth.service.js'
 import { unblockUser } from '../services/interactions.service.js'
 import { uploadHeaderImage } from '../services/media.service.js'
 
+// ─────────────────────────────────────────────────────────────────
+//  Öffentliche API: Modal öffnen / schließen
+// ─────────────────────────────────────────────────────────────────
+
 /**
- * Zeigt die Einstellungs-Seite mit Tile-Grid und Popups.
+ * Öffnet die Einstellungen als Modal/Popup mit Glassmorphismus-Design.
  * @param {object} profile
- * @param {object} session
- * @param {{ navigate: function, openComposer: function, toggleNotif: function, realtimeChannel: object|null, notifChannel: object|null }} ctx
+ * @param {{ navigate: function, openComposer: function, toggleNotif: function, realtimeChannel?: object|null, notifChannel?: object|null }} ctx
  */
-export async function showSettingsPage(profile, session, ctx) {
-  const { navigate, openComposer, toggleNotif } = ctx
-  applyNavPref()
-  document.body.classList.add('has-global-header')
-  document.body.classList.remove('profile-page')
-
-  const navPref = getNavPref()
-  const profilePrivacy = profile.profile_privacy || 'public'
-  const avatarLetter = (profile.display_name || profile.username || '?')[0].toUpperCase()
-
-  updateActiveNav('settings')
-  updateShellContent(`
-    <div class="settings-wrap">
-
-      <!-- ── User Info ── -->
-      <div class="settings-user">
-        <div class="settings-user-avatar">${avatarLetter}</div>
-        <div class="settings-user-body">
-          <div class="settings-user-name">${escapeHtml(profile.display_name || profile.username)}</div>
-          <div class="settings-user-email">@${escapeHtml(profile.username)} · ${escapeHtml(session.user.email || '')}</div>
+export function openSettingsModal(profile, ctx) {
+  // Modal-Overlay + Modal erstellen
+  const overlay = document.createElement('div')
+  overlay.className = 'settings-overlay'
+  overlay.innerHTML = `
+    <div class="settings-modal">
+      <div class="settings-modal-head">
+        <span class="settings-modal-title">Einstellungen</span>
+        <button class="settings-modal-close" id="settings-close">&#10005;</button>
+      </div>
+      <div class="settings-modal-body">
+        <div class="settings-grid">
+          <button class="settings-tile" id="set-edit-profile">
+            <span class="settings-tile-icon">&#9998;</span>
+            <span class="settings-tile-title">Profil bearbeiten</span>
+            <span class="settings-tile-desc">Name, Bio, Header, Links</span>
+          </button>
+          <button class="settings-tile" id="set-privacy">
+            <span class="settings-tile-icon">&#128274;</span>
+            <span class="settings-tile-title">Privacy</span>
+            <span class="settings-tile-desc">Profil-Sichtbarkeit</span>
+          </button>
+          <button class="settings-tile" id="set-blocks">
+            <span class="settings-tile-icon">&#128683;</span>
+            <span class="settings-tile-title">Blockierte Nutzer</span>
+            <span class="settings-tile-desc">Verwalte Blockierungen</span>
+          </button>
+          <button class="settings-tile" id="set-nav">
+            <span class="settings-tile-icon">&#8858;</span>
+            <span class="settings-tile-title">Navigation</span>
+            <span class="settings-tile-desc">Sidebar oder Bottom</span>
+          </button>
+        </div>
+        <div style="display:flex;justify-content:center;margin-top:32px;">
+          <button id="set-logout" class="logout-btn">&#128163; Ausloggen</button>
         </div>
       </div>
-
-      <!-- ── Tile Grid ── -->
-      <div class="settings-grid">
-
-        <button class="settings-tile" data-action="edit">
-          <span class="settings-tile-icon">✎</span>
-          <span class="settings-tile-title">Profil bearbeiten</span>
-          <span class="settings-tile-desc">Name, Bio, Header, Links</span>
-        </button>
-
-        <button class="settings-tile" data-action="privacy">
-          <span class="settings-tile-icon">🔒</span>
-          <span class="settings-tile-title">Privacy</span>
-          <span class="settings-tile-desc">Sichtbarkeit deines Profils</span>
-        </button>
-
-        <button class="settings-tile" data-action="blocks">
-          <span class="settings-tile-icon">🚫</span>
-          <span class="settings-tile-title">Blockierte Nutzer</span>
-          <span class="settings-tile-desc">Verwalte blockierte Profile</span>
-        </button>
-
-        <button class="settings-tile" data-action="nav">
-          <span class="settings-tile-icon">⊞</span>
-          <span class="settings-tile-title">Navigation</span>
-          <span class="settings-tile-desc">Auto · Sidebar · Bottom</span>
-        </button>
-
-      </div>
-
-      <div style="display:flex;justify-content:center;margin-top:32px;">
-        <button id="set-logout" class="logout-btn">⏻ Ausloggen</button>
-      </div>
     </div>
+  `
 
-    <!-- ── Modal Host ── -->
-    <div id="settings-modals-host"></div>`)
+  document.body.appendChild(overlay)
 
-  // ── Global Header ──
-  updateGlobalHeader({
-    tone: 'auto',
-    title: 'Einstellungen',
-    showSearch: true,
-    showBack: true,
+  // Click-outside to close
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) closeSettingsModal()
   })
 
-  wireShellNav(profile, { navigate, openComposer, toggleNotif })
+  overlay.querySelector('#settings-close').addEventListener('click', closeSettingsModal)
 
-  getUnreadCount(profile.id).then(c => {
-    refreshUnreadBadge(c)
-    refreshGlobalHeaderBadge(c)
-  }).catch(() => {})
+  // Wire up all settings tile logic
+  wireSettingsLogic(overlay, profile, ctx)
 
-  // ── Tile Click Handler ──
-  document.querySelectorAll('.settings-tile').forEach(tile => {
-    tile.addEventListener('click', () => {
-      const action = tile.dataset.action
-      if (action === 'edit') openEditModal(profile, session, ctx)
-      else if (action === 'privacy') openPrivacyModal(profile)
-      else if (action === 'blocks') openBlocksModal(profile.id)
-      else if (action === 'nav') openNavModal()
-    })
+  // Body scroll lock
+  document.body.classList.add('no-scroll')
+}
+
+function closeSettingsModal() {
+  const overlay = document.querySelector('.settings-overlay')
+  if (overlay) overlay.remove()
+  // Auch offene Sub-Modals schließen
+  const subWrap = document.querySelector('.settings-sub-modal-wrap')
+  if (subWrap) subWrap.remove()
+  document.body.classList.remove('no-scroll')
+}
+
+function wireSettingsLogic(overlay, profile, ctx) {
+  // Edit Profile
+  overlay.querySelector('#set-edit-profile').addEventListener('click', () => {
+    openEditModal(profile, ctx)
   })
 
-  // ── Logout Button ──
-  document.getElementById('set-logout')?.addEventListener('click', () => handleLogout(ctx))
+  // Privacy
+  overlay.querySelector('#set-privacy').addEventListener('click', () => {
+    openPrivacyModal(profile)
+  })
+
+  // Blocks
+  overlay.querySelector('#set-blocks').addEventListener('click', () => {
+    openBlocksModal(profile.id)
+  })
+
+  // Navigation
+  overlay.querySelector('#set-nav').addEventListener('click', () => {
+    openNavModal()
+  })
+
+  // Logout
+  overlay.querySelector('#set-logout').addEventListener('click', () => handleLogout(ctx))
+}
+
+// ─────────────────────────────────────────────────────────────────
+//  showSettingsPage – für Router-Kompatibilität
+//  Öffnet intern das Modal (ersetzt die alte Page)
+// ─────────────────────────────────────────────────────────────────
+
+/**
+ * @deprecated Settings ist jetzt ein Modal. Nutze openSettingsModal().
+ * Wird vom Router aufgerufen, falls die /settings Route noch existiert.
+ */
+export async function showSettingsPage(profile, session, ctx) {
+  openSettingsModal(profile, ctx)
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -111,30 +127,33 @@ async function handleLogout(ctx) {
   if (ctx.realtimeChannel) { await supabase.removeChannel(ctx.realtimeChannel); ctx.realtimeChannel = null }
   if (ctx.notifChannel) { await supabase.removeChannel(ctx.notifChannel); ctx.notifChannel = null }
   await signOut()
+  closeSettingsModal()
   ctx.navigate('/')
 }
 
 // ─────────────────────────────────────────────────────────────────
-//  Modal-Helper: open / close
+//  Sub-Modal-Helper: open / close
+//  Sub-Modals werden in einem Wrapper an document.body gehängt,
+//  damit sie über dem Settings-Modal (z-index 200) schweben.
 // ─────────────────────────────────────────────────────────────────
 
 function _openModal(html) {
-  const host = document.querySelector('#settings-modals-host')
-  host.innerHTML = html
-  document.body.classList.add('no-scroll')
+  const wrapper = document.createElement('div')
+  wrapper.className = 'settings-sub-modal-wrap'
+  wrapper.innerHTML = html
+  document.body.appendChild(wrapper)
 }
 
 function _closeModal() {
-  const host = document.querySelector('#settings-modals-host')
-  host.innerHTML = ''
-  document.body.classList.remove('no-scroll')
+  const wrapper = document.querySelector('.settings-sub-modal-wrap')
+  if (wrapper) wrapper.remove()
 }
 
 // ─────────────────────────────────────────────────────────────────
 //  Edit Profile Modal
 // ─────────────────────────────────────────────────────────────────
 
-function openEditModal(profile, session, ctx) {
+function openEditModal(profile, ctx) {
   const { navigate } = ctx
   let currentType = profile.header_type || 'color'
   let currentColor = profile.header_color || '#0a0a0a'
@@ -157,8 +176,8 @@ function openEditModal(profile, session, ctx) {
   ]
 
   _openModal(`
-    <div class="modal-overlay show" id="edit-overlay"></div>
-    <div class="modal show" role="dialog" aria-label="Profil bearbeiten">
+    <div class="settings-sub-overlay" id="edit-overlay"></div>
+    <div class="settings-sub-modal" role="dialog" aria-label="Profil bearbeiten">
       <div class="modal-head">
         <span class="modal-title">Profil bearbeiten</span>
         <button class="icon-btn icon-btn-sm" id="edit-close">${iconSvg('x', 16)}</button>
@@ -335,7 +354,7 @@ function openEditModal(profile, session, ctx) {
     })
     if (error) { msg.textContent = '❌ ' + error.message; return }
     msg.textContent = '✅ Gespeichert!'
-    setTimeout(() => { _closeModal(); navigate('/u/' + profile.username) }, 800)
+    setTimeout(() => { _closeModal(); closeSettingsModal(); navigate('/u/' + profile.username) }, 800)
   })
 }
 
@@ -347,8 +366,8 @@ function openPrivacyModal(profile) {
   const profilePrivacy = profile.profile_privacy || 'public'
 
   _openModal(`
-    <div class="modal-overlay show" id="pv-overlay"></div>
-    <div class="modal show" role="dialog" aria-label="Privacy">
+    <div class="settings-sub-overlay" id="pv-overlay"></div>
+    <div class="settings-sub-modal" role="dialog" aria-label="Privacy">
       <div class="modal-head">
         <span class="modal-title">Profil-Sichtbarkeit</span>
         <button class="icon-btn icon-btn-sm" id="pv-close">${iconSvg('x', 16)}</button>
@@ -398,8 +417,8 @@ function openNavModal() {
   const navPref = getNavPref()
 
   _openModal(`
-    <div class="modal-overlay show" id="nav-overlay"></div>
-    <div class="modal show" role="dialog" aria-label="Navigation">
+    <div class="settings-sub-overlay" id="nav-overlay"></div>
+    <div class="settings-sub-modal" role="dialog" aria-label="Navigation">
       <div class="modal-head">
         <span class="modal-title">Navigation</span>
         <button class="icon-btn icon-btn-sm" id="nav-close">${iconSvg('x', 16)}</button>
@@ -443,7 +462,6 @@ function openNavModal() {
 // ─────────────────────────────────────────────────────────────────
 
 export async function openBlocksModal(userId) {
-  const host = document.querySelector('#settings-modals-host')
   const blocks = await getMyBlocks(userId)
 
   let rows = '<p style="color:var(--text-mute);font-size:13px;padding:16px;">Niemand blockiert.</p>'
@@ -462,9 +480,9 @@ export async function openBlocksModal(userId) {
     }).join('')
   }
 
-  host.innerHTML = `
-    <div class="modal-overlay show" id="blk-overlay"></div>
-    <div class="modal show" role="dialog" aria-label="Blockierte Nutzer">
+  _openModal(`
+    <div class="settings-sub-overlay" id="blk-overlay"></div>
+    <div class="settings-sub-modal" role="dialog" aria-label="Blockierte Nutzer">
       <div class="modal-head">
         <span class="modal-title">Blockierte Nutzer</span>
         <button class="icon-btn icon-btn-sm" id="blk-close">${iconSvg('x', 16)}</button>
@@ -472,13 +490,12 @@ export async function openBlocksModal(userId) {
       <div class="modal-body" style="padding:8px;">
         <div class="settings-list">${rows}</div>
       </div>
-    </div>`
+    </div>`)
 
-  document.body.classList.add('no-scroll')
   document.querySelector('#blk-close').onclick = _closeModal
   document.querySelector('#blk-overlay').onclick = _closeModal
 
-  host.querySelectorAll('[data-unblock]').forEach(btn => {
+  document.querySelectorAll('[data-unblock]').forEach(btn => {
     btn.onclick = async () => {
       btn.disabled = true
       const id = btn.dataset.unblock

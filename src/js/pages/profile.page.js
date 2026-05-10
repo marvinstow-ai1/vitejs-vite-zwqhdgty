@@ -1,6 +1,7 @@
 import { supabase } from '../supabase.js'
 import { getSession } from '../services/auth.service.js'
 import { getProfileByUsername, updateProfile, getFollowCounts, getRelationshipStatus } from '../services/profiles.service.js'
+import { openSettingsModal } from './settings.page.js'
 import { getVisiblePostIds } from '../services/posts.service.js'
 import { followUser, unfollowUser, sendFollowRequest, withdrawFollowRequest, blockUser, unblockUser } from '../services/interactions.service.js'
 import { notifyAction } from '../services/notify.action.js'
@@ -348,7 +349,7 @@ export async function showProfilePage(username, ctx) {
   setGlobalHeaderTone(tone)
 
   // ── Basic Listeners ──────────────────────────────────────────────────────────
-  document.querySelector('#btn-settings-link')?.addEventListener('click', () => navigate('/settings'))
+  document.querySelector('#btn-settings-link')?.addEventListener('click', () => openSettingsModal(profile, ctx))
   document.querySelector('#btn-info').addEventListener('click', () => {
     const p = document.querySelector('#info-panel')
     p.style.display = p.style.display === 'none' ? 'block' : 'none'
