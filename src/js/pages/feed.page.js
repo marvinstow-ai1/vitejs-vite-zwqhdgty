@@ -260,28 +260,32 @@ function _renderFeedCard(post, currentUserId, usernameMap, interactions) {
   const vis = post.visibility || 'public'
   const isOwn = post.user_id === currentUserId
   const visBadge = isOwn && vis !== 'public'
-    ? `<div style="position:absolute;top:6px;left:6px;background:rgba(0,0,0,0.65);border-radius:10px;padding:2px 7px;font-size:10px;color:#ccc;">${vis === 'followers' ? '👥' : '🔒'}</div>`
+    ? `<div style="position:absolute;top:6px;left:6px;z-index:3;background:rgba(0,0,0,0.65);border-radius:10px;padding:2px 7px;font-size:10px;color:#ccc;">${vis === 'followers' ? '👥' : '🔒'}</div>`
     : ''
   return `
     <div class="unified-cell" data-post-id="${post.id}">
-      <div class="post-media-wrap" data-post-id="${post.id}" data-media-url="${escapeHtml(post.media_url)}" data-media-type="${mt}" data-owner-id="${post.user_id}" style="cursor:${isEmbed ? 'default' : 'pointer'};position:relative;">
+      <div class="post-media-wrap" data-post-id="${post.id}" data-media-url="${escapeHtml(post.media_url)}" data-media-type="${mt}" data-owner-id="${post.user_id}" style="position:absolute;inset:0;cursor:${isEmbed ? 'default' : 'pointer'};">
         ${renderMediaEl(post.media_url, mt)}
         ${visBadge}
       </div>
-      <div class="feed-card-foot">
-        <div class="meta">
-          <span class="username-link" data-username="${username}" style="font-size:12px;color:#777;cursor:pointer;display:block;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">@${username}</span>
-          ${post.mood ? `<span class="mood-tag" data-mood="${post.mood}" style="font-size:11px;color:#555;cursor:pointer;">#${post.mood}</span>` : ''}
+      <!-- Hover/Tap Overlay (wie Explore) -->
+      <div class="feed-overlay">
+        <div class="feed-overlay-top">
+          <span class="feed-username" data-username="${username}">@${username}</span>
+          ${post.mood ? `<span class="feed-mood-tag" data-mood="${post.mood}">#${post.mood}</span>` : ''}
         </div>
-        <div class="actions">
-          <button class="comment-btn" data-post-id="${post.id}" data-media-url="${escapeHtml(post.media_url)}" data-media-type="${mt}" data-owner-id="${post.user_id}" style="display:flex;align-items:center;gap:3px;background:none;border:none;cursor:pointer;color:#555;font-size:12px;padding:4px 6px;border-radius:6px;">
-            <span style="font-size:14px;">💬</span><span class="comment-count" data-post-id="${post.id}">${cc}</span>
+        <div class="feed-overlay-actions">
+          <button class="feed-like-btn" data-post-id="${post.id}" data-liked="${liked}" data-owner-id="${post.user_id}" style="color:${liked ? '#ff4d6d' : '#fff'};">
+            <span class="feed-like-icon">${liked ? '♥' : '♡'}</span>
+            <span class="feed-like-count" data-post-id="${post.id}">${lc}</span>
           </button>
-          <button class="repost-btn" data-post-id="${post.id}" data-reposted="${reposted}" data-owner-id="${post.user_id}" style="display:flex;align-items:center;gap:3px;background:none;border:none;cursor:pointer;color:${reposted ? '#06d6a0' : '#555'};font-size:12px;padding:4px 6px;border-radius:6px;">
-            <span style="font-size:14px;">🔁</span><span class="repost-count" data-post-id="${post.id}">${rc}</span>
+          <button class="feed-comment-btn" data-post-id="${post.id}" data-media-url="${escapeHtml(post.media_url)}" data-media-type="${mt}" data-owner-id="${post.user_id}">
+            <span>💬</span>
+            <span class="feed-comment-count" data-post-id="${post.id}">${cc}</span>
           </button>
-          <button class="like-btn" data-post-id="${post.id}" data-liked="${liked}" data-owner-id="${post.user_id}" style="display:flex;align-items:center;gap:3px;background:none;border:none;cursor:pointer;color:${liked ? '#ff4d6d' : '#555'};font-size:12px;padding:4px 6px;border-radius:6px;">
-            <span class="like-icon" style="font-size:15px;">${liked ? '♥' : '♡'}</span><span class="like-count" data-post-id="${post.id}">${lc}</span>
+          <button class="feed-repost-btn" data-post-id="${post.id}" data-reposted="${reposted}" data-owner-id="${post.user_id}" style="color:${reposted ? '#06d6a0' : '#fff'};">
+            <span>🔁</span>
+            <span class="feed-repost-count" data-post-id="${post.id}">${rc}</span>
           </button>
         </div>
       </div>
@@ -289,41 +293,62 @@ function _renderFeedCard(post, currentUserId, usernameMap, interactions) {
 }
 
 function _wireFeedActions(profile, navigate) {
-  document.querySelectorAll('#feed-grid .like-btn').forEach(btn =>
-    btn.addEventListener('click', () => _handleLike(btn, profile.id))
+  // Like
+  document.querySelectorAll('#feed-grid .feed-like-btn').forEach(btn =>
+    btn.addEventListener('click', e => { e.stopPropagation(); _handleLike(btn, profile.id) })
   )
-  document.querySelectorAll('#feed-grid .repost-btn').forEach(btn =>
-    btn.addEventListener('click', () => _handleRepost(btn, profile.id))
+  // Repost
+  document.querySelectorAll('#feed-grid .feed-repost-btn').forEach(btn =>
+    btn.addEventListener('click', e => { e.stopPropagation(); _handleRepost(btn, profile.id) })
   )
-  document.querySelectorAll('#feed-grid .comment-btn').forEach(btn =>
-    btn.addEventListener('click', () => openCommentsModal(
-      btn.dataset.postId, btn.dataset.mediaUrl, btn.dataset.mediaType, profile.id, btn.dataset.ownerId
-    ))
+  // Comment
+  document.querySelectorAll('#feed-grid .feed-comment-btn').forEach(btn =>
+    btn.addEventListener('click', e => {
+      e.stopPropagation()
+      openCommentsModal(btn.dataset.postId, btn.dataset.mediaUrl, btn.dataset.mediaType, profile.id, btn.dataset.ownerId)
+    })
   )
+  // Media-Klick → Comments Modal
   document.querySelectorAll('#feed-grid .post-media-wrap').forEach(wrap => {
     if (wrap.dataset.mediaType === 'youtube' || wrap.dataset.mediaType === 'instagram') return
     wrap.addEventListener('click', () => openCommentsModal(
       wrap.dataset.postId, wrap.dataset.mediaUrl, wrap.dataset.mediaType, profile.id, wrap.dataset.ownerId
     ))
   })
-  document.querySelectorAll('#feed-grid .username-link').forEach(el =>
-    el.addEventListener('click', () => navigate('/u/' + el.dataset.username))
+  // Username-Klick → Profil
+  document.querySelectorAll('#feed-grid .feed-username').forEach(el =>
+    el.addEventListener('click', e => { e.stopPropagation(); navigate('/u/' + el.dataset.username) })
   )
-  document.querySelectorAll('#feed-grid .mood-tag').forEach(tag =>
-    tag.addEventListener('click', () => {
+  // Mood-Tag-Klick → Filter
+  document.querySelectorAll('#feed-grid .feed-mood-tag').forEach(tag =>
+    tag.addEventListener('click', e => {
+      e.stopPropagation()
       activeMood = tag.dataset.mood
       loadFeed(profile, navigate)
       window.scrollTo({ top: 0, behavior: 'smooth' })
     })
   )
+  // Mobile: Tap auf unified-cell toggelt Overlay (wie Instagram)
+  document.querySelectorAll('#feed-grid .unified-cell').forEach(cell => {
+    cell.addEventListener('click', e => {
+      // Nur toggeln wenn direkt auf die Zelle geklickt wurde (nicht auf Buttons/Links)
+      if (e.target.closest('.feed-overlay-actions') || e.target.closest('.feed-username') || e.target.closest('.feed-mood-tag')) return
+      const overlay = cell.querySelector('.feed-overlay')
+      if (!overlay) return
+      // Prüfen ob hover-fähig (Desktop) – dann nicht toggeln
+      const isHoverable = window.matchMedia('(hover: hover)').matches
+      if (isHoverable) return
+      overlay.classList.toggle('show')
+    })
+  })
 }
 
 async function _handleLike(btn, currentUserId) {
   const postId = btn.dataset.postId
   const liked = btn.dataset.liked === 'true'
   const ownerId = btn.dataset.ownerId
-  const countEl = btn.querySelector('.like-count')
-  const iconEl = btn.querySelector('.like-icon')
+  const countEl = btn.querySelector('.feed-like-count')
+  const iconEl = btn.querySelector('.feed-like-icon')
   const current = parseInt(countEl?.textContent || '0')
 
   // Optimistic UI
@@ -346,7 +371,7 @@ async function _handleRepost(btn, currentUserId) {
   const postId = btn.dataset.postId
   const reposted = btn.dataset.reposted === 'true'
   const ownerId = btn.dataset.ownerId
-  const countEl = btn.querySelector('.repost-count')
+  const countEl = btn.querySelector('.feed-repost-count')
   const current = parseInt(countEl?.textContent || '0')
 
   if (reposted) {
@@ -1038,7 +1063,7 @@ export async function openCommentsModal(postId, mediaUrl, mediaType, currentUser
     input.value = ''
     const updated = await loadComments(postId)
     _renderComments(updated, list)
-    const countEl = document.querySelector(`.comment-count[data-post-id="${postId}"]`)
+    const countEl = document.querySelector(`.feed-comment-count[data-post-id="${postId}"]`)
     if (countEl) countEl.textContent = parseInt(countEl.textContent || '0') + 1
     list.scrollTop = list.scrollHeight
     if (postOwnerId) await notifyAction(postOwnerId, currentUserId, 'comment', postId)
@@ -1068,7 +1093,7 @@ export function setupRealtimeLikes(currentUserId, onChannelReady) {
       const postId = payload.new?.post_id || payload.old?.post_id; if (!postId) return
       if ((payload.new?.user_id || payload.old?.user_id) === currentUserId) return
       const count = await getLikeCount(postId)
-      const el = document.querySelector(`.like-count[data-post-id="${postId}"]`)
+      const el = document.querySelector(`.feed-like-count[data-post-id="${postId}"]`)
       if (el) el.textContent = count
     }).subscribe()
   onChannelReady?.(channel)

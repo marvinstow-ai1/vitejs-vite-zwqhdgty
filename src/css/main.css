@@ -100,7 +100,7 @@ a { color: inherit; text-decoration: none; }
 .app-shell {
   min-height: 100vh;
   display: grid;
-  grid-template-columns: 220px 1fr;
+  grid-template-columns: 1fr;
 }
 .app-main { min-width: 0; padding-bottom: 24px; }
 
@@ -109,69 +109,26 @@ body.has-global-header .app-main { padding-top: 52px; }
 /* Profil-Seite: kein padding-top, Hero überlagert den Header */
 body.has-global-header.profile-page .app-main { padding-top: 0; }
 
-/* ─── Sidebar (desktop) ────────────────────────────────────── */
-.sidebar {
-  position: sticky; top: 0;
-  height: 100vh;
-  border-right: 1px solid var(--border);
-  background: var(--bg);
-  padding: 16px 12px;
-  display: flex; flex-direction: column; gap: 4px;
-  z-index: 20;
-}
-/* Sidebar unter globalem Header einrücken */
-body.has-global-header .sidebar {
-  top: 52px;
-  height: calc(100vh - 52px);
-}
-.sidebar-brand {
-  font-size: 16px; font-weight: 600; letter-spacing: .02em;
-  padding: 10px 12px 18px;
-  cursor: pointer;
-}
-.nav-item {
-  display: flex; align-items: center; gap: 12px;
-  padding: 10px 12px;
-  border-radius: var(--radius-md);
-  font-size: 14px; font-weight: 500;
-  color: rgba(255,255,255,.7);
-  cursor: pointer;
-  border: 0; background: transparent; width: 100%;
-  transition: background .15s, color .15s;
-  text-align: left;
-}
-.nav-item:hover { background: rgba(255,255,255,.07); color: #fff; }
-.nav-item.active { background: rgba(255,255,255,.10); color: #fff; }
-.nav-item svg { width: 20px; height: 20px; flex-shrink: 0; }
-.nav-badge {
-  margin-left: auto;
-  min-width: 18px; height: 18px;
-  border-radius: 999px;
-  background: var(--danger);
-  color: #fff;
-  font-size: 10px; font-weight: 700;
-  padding: 0 5px;
-  display: grid; place-items: center;
-}
-.sidebar-spacer { flex: 1; }
+/* ─── Sidebar – ausgeblendet, Bottombar ersetzt sie ── */
+.sidebar { display: none; }
 
-/* ─── Bottom nav (mobile) ──────────────────────────────────── */
+/* ─── Bottom nav (immer sichtbar, volle Breite) ────────────── */
 .bottombar {
-  position: fixed; left: 50%; bottom: 12px;
-  transform: translateX(-50%);
+  position: fixed; bottom: 0; left: 0; right: 0;
   z-index: 30;
-  display: none;
-  align-items: center; gap: 2px;
-  background: rgba(10,10,10,.78);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-pill);
-  padding: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  background: rgba(10,10,10,.92);
+  border-top: 1px solid var(--border);
+  padding: 8px 12px;
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  box-shadow: 0 8px 32px rgba(0,0,0,.5);
+  box-shadow: 0 -4px 20px rgba(0,0,0,.4);
 }
 .bottombar-btn {
-  width: 44px; height: 44px;
+  width: 48px; height: 48px;
   border-radius: var(--radius-pill);
   border: 0; background: transparent;
   color: #fff; cursor: pointer;
@@ -194,18 +151,8 @@ body.has-global-header .sidebar {
 }
 .bottombar-btn .nav-dot.show { display: block; }
 
-/* layout overrides */
-body[data-nav="bottom"] .sidebar { display: none; }
-body[data-nav="bottom"] .app-shell { grid-template-columns: 1fr; }
-body[data-nav="bottom"] .bottombar { display: flex; }
-body[data-nav="bottom"] .app-main { padding-bottom: 96px; }
-
-@media (max-width: 900px) {
-  body[data-nav="auto"] .sidebar { display: none; }
-  body[data-nav="auto"] .app-shell { grid-template-columns: 1fr; }
-  body[data-nav="auto"] .bottombar { display: flex; }
-  body[data-nav="auto"] .app-main { padding-bottom: 96px; }
-}
+/* Bottombar immer sichtbar → padding am main */
+.app-main { padding-bottom: 80px; }
 
 /* ─── Top bar (legacy, wird durch global-header ersetzt) ───── */
 .topbar {
@@ -582,15 +529,82 @@ body[data-nav="bottom"] .app-main { padding-bottom: 96px; }
 .toast.show { opacity: 1; }
 
 /* ─── Feed wrapper ─────────────────────────────────────────── */
-.feed-wrap { max-width: 720px; margin: 0 auto; padding: 12px 12px 96px; }
+.feed-wrap { width: 100%; margin: 0; padding: 0; }
 
-/* ─── Feed card foot (shared across pages) ─────────────────── */
-.feed-card-foot {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 8px 10px;
+/* ─── Feed Overlay (Hover/Tap) ─────────────────────────────── */
+.feed-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,0);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 10px;
+  opacity: 0;
+  transition: opacity .18s, background .18s;
+  pointer-events: none;
+  z-index: 2;
 }
-.feed-card-foot .meta { min-width: 0; }
-.feed-card-foot .actions { display: flex; align-items: center; gap: 2px; flex-shrink: 0; }
+
+.unified-cell:hover .feed-overlay {
+  opacity: 1;
+  background: rgba(0,0,0,0.5);
+}
+
+.feed-overlay.show {
+  opacity: 1;
+  background: rgba(0,0,0,0.5);
+}
+
+.feed-overlay-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.feed-username {
+  font-size: 11px;
+  color: rgba(255,255,255,0.85);
+  pointer-events: all;
+  cursor: pointer;
+  max-width: 80px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.feed-mood-tag {
+  font-size: 10px;
+  color: rgba(255,255,255,0.5);
+  pointer-events: all;
+  cursor: pointer;
+}
+
+.feed-overlay-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  justify-content: center;
+}
+
+.feed-overlay-actions button {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  background: rgba(0,0,0,0.5);
+  border: 1px solid rgba(255,255,255,0.15);
+  cursor: pointer;
+  color: #fff;
+  font-size: 11px;
+  padding: 5px 8px;
+  border-radius: 6px;
+  pointer-events: all;
+  transition: background .12s;
+}
+
+.feed-overlay-actions button:hover {
+  background: rgba(255,255,255,0.15);
+}
 .feed-state {
   max-width: 480px; margin: 32px auto;
   padding: 28px 20px;
