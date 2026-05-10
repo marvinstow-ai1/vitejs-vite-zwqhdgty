@@ -218,8 +218,11 @@ export function shellHtml(active, profile) {
 
 // ─── Shell wiring ─────────────────────────────────────────────────────────────
 
+let _navListeners = []
+
 /**
  * Verdrahtet alle Nav-Buttons in Shell.
+ * Entfernt vorherige Listener, sodass mehrfacher Aufruf sicher ist.
  * Benötigt navigate() und openComposerModal() als Callbacks,
  * um zirkuläre Imports zu vermeiden.
  *
@@ -228,15 +231,63 @@ export function shellHtml(active, profile) {
  */
 export function wireShellNav(profile, { navigate, openComposer, toggleNotif }) {
   const u = profile?.username
+
+  // Alte Listener entfernen (wichtig bei persistentem DOM)
+  _navListeners.forEach(({ el, fn }) => el.removeEventListener('click', fn))
+  _navListeners = []
+
   document.querySelectorAll('[data-nav-key]').forEach(el => {
     const key = el.dataset.navKey
-    el.addEventListener('click', () => {
+    const fn = () => {
       if (key === 'home' || key === 'brand') navigate('/')
       else if (key === 'explore') navigate('/explore')
       else if (key === 'profile') { if (u) navigate('/u/' + u) }
       else if (key === 'settings') navigate('/settings')
       else if (key === 'post') openComposer(profile)
       else if (key === 'notif') toggleNotif(profile)
-    })
+    }
+    el.addEventListener('click', fn)
+    _navListeners.push({ el, fn })
+  })
+}
+
+// ─── Shell Rendering (einmalig) ───────────────────────────────────────────────
+
+/**
+ * Rendert die Shell (Sidebar + Bottombar + <main>) einmalig.
+ * Wird nur ausgeführt, wenn noch keine .app-shell im DOM existiert.
+ * @param {string} activeKey — aktiver Nav-Key (z.B. 'home')
+ * @param {object|null} profile
+ */
+export function renderShell(activeKey, profile) {
+  if (document.querySelector('.app-shell')) return
+
+  document.querySelector('#app').innerHTML = `
+    <div class="app-shell">
+      ${shellHtml(activeKey, profile)}
+      <main class="app-main" id="app-main"></main>
+    </div>
+  `
+}
+
+/**
+ * Ersetzt nur den Inhalt von <main id="app-main">.
+ * Die Shell (Sidebar + Bottombar) bleibt erhalten.
+ * @param {string} html
+ */
+export function updateShellContent(html) {
+  const main = document.querySelector('#app-main')
+  if (main) {
+    main.innerHTML = html
+  }
+}
+
+/**
+ * Aktualisiert die active-Klasse in der Navigation.
+ * @param {string} activeKey
+ */
+export function updateActiveNav(activeKey) {
+  document.querySelectorAll('[data-nav-key]').forEach(el => {
+    el.classList.toggle('active', el.dataset.navKey === activeKey)
   })
 }

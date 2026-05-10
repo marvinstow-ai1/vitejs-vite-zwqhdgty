@@ -1,5 +1,5 @@
 import '../css/main.css'
-import { applyNavPref } from './shell.js'
+import { applyNavPref, renderShell, wireShellNav } from './shell.js'
 import { navigate, handleRoute, registerHandlers } from './router.js'
 import { getSession } from './services/auth.service.js'
 import { getProfileById } from './services/profiles.service.js'
@@ -49,6 +49,11 @@ async function init() {
   }
 
   currentProfile = profile
+
+  // Shell einmalig rendern – danach nur noch updateShellContent() in Pages
+  renderShell('home', profile)
+  wireShellNav(profile, getNavCallbacks())
+
   await showFeed(profile, {
     ...getNavCallbacks(),
     onNotifChannelReady: (ch) => { notifChannel = ch },

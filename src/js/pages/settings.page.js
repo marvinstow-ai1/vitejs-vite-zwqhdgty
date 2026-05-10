@@ -1,5 +1,5 @@
 import { supabase } from '../supabase.js'
-import { shellHtml, wireShellNav, applyNavPref, getNavPref, setNavPref, refreshUnreadBadge, renderGlobalHeader, refreshGlobalHeaderBadge } from '../shell.js'
+import { updateShellContent, updateActiveNav, wireShellNav, applyNavPref, getNavPref, setNavPref, refreshUnreadBadge, renderGlobalHeader, refreshGlobalHeaderBadge } from '../shell.js'
 import { iconSvg, escapeHtml } from '../utils.js'
 import { getUnreadCount } from '../services/notifications.service.js'
 import { updateProfile, getMyBlocks } from '../services/profiles.service.js'
@@ -21,105 +21,100 @@ export async function showSettingsPage(profile, session, ctx) {
   const navPref = getNavPref()
   const profilePrivacy = profile.profile_privacy || 'public'
 
-  document.querySelector('#app').innerHTML = `
-    <div class="app-shell">
-      ${shellHtml('settings', profile)}
-      <main class="app-main">
-        <div class="settings-wrap">
+  updateActiveNav('settings')
+  updateShellContent(`
+    <div class="settings-wrap">
 
-          <section class="settings-section">
-            <h2>Account</h2>
-            <div class="settings-list">
-              <div class="settings-row" style="cursor:default;">
-                <span class="icon">${iconSvg('user', 18)}</span>
-                <div class="body">
-                  <div class="title">@${escapeHtml(profile.username)}</div>
-                  <div class="desc">${escapeHtml(session.user.email || '')}</div>
-                </div>
-              </div>
+      <section class="settings-section">
+        <h2>Account</h2>
+        <div class="settings-list">
+          <div class="settings-row" style="cursor:default;">
+            <span class="icon">${iconSvg('user', 18)}</span>
+            <div class="body">
+              <div class="title">@${escapeHtml(profile.username)}</div>
+              <div class="desc">${escapeHtml(session.user.email || '')}</div>
             </div>
-          </section>
-
-          <section class="settings-section">
-            <h2>Profil</h2>
-            <div class="settings-list">
-              <button class="settings-row" id="set-edit-profile">
-                <span class="icon">${iconSvg('edit', 18)}</span>
-                <div class="body">
-                  <div class="title">Profil bearbeiten</div>
-                  <div class="desc">Display-Name, Bio, Header, Links</div>
-                </div>
-                <span class="chev">${iconSvg('chevR', 14)}</span>
-              </button>
-            </div>
-          </section>
-
-          <section class="settings-section">
-            <h2>Privacy</h2>
-            <div class="settings-list">
-              <div class="settings-row" style="cursor:default;flex-direction:column;align-items:stretch;">
-                <div style="display:flex;align-items:center;gap:12px;width:100%;">
-                  <span class="icon">${iconSvg('lock', 18)}</span>
-                  <div class="body">
-                    <div class="title">Profil-Sichtbarkeit</div>
-                    <div class="desc">Wer dein Profil und deine Posts sehen darf.</div>
-                  </div>
-                </div>
-                <div class="seg" style="margin-top:12px;" id="privacy-seg">
-                  <button class="seg-btn ${profilePrivacy === 'public' ? 'active' : ''}" data-pv="public">🌍 Öffentlich</button>
-                  <button class="seg-btn ${profilePrivacy === 'followers' ? 'active' : ''}" data-pv="followers">👥 Follower</button>
-                  <button class="seg-btn ${profilePrivacy === 'private' ? 'active' : ''}" data-pv="private">🔒 Privat</button>
-                </div>
-              </div>
-              <button class="settings-row" id="set-blocks">
-                <span class="icon">${iconSvg('ban', 18)}</span>
-                <div class="body">
-                  <div class="title">Blockierte Nutzer</div>
-                  <div class="desc">Verwalte, wen du blockiert hast.</div>
-                </div>
-                <span class="chev">${iconSvg('chevR', 14)}</span>
-              </button>
-            </div>
-          </section>
-
-          <section class="settings-section">
-            <h2>Layout</h2>
-            <div class="settings-list">
-              <div class="settings-row" style="cursor:default;flex-direction:column;align-items:stretch;">
-                <div style="display:flex;align-items:center;gap:12px;width:100%;">
-                  <span class="icon">${iconSvg('layout', 18)}</span>
-                  <div class="body">
-                    <div class="title">Navigation</div>
-                    <div class="desc">Wo soll die Hauptnavigation erscheinen?</div>
-                  </div>
-                </div>
-                <div class="seg" style="margin-top:12px;" id="nav-seg">
-                  <button class="seg-btn ${navPref === 'auto' ? 'active' : ''}" data-nav="auto">Auto</button>
-                  <button class="seg-btn ${navPref === 'sidebar' ? 'active' : ''}" data-nav="sidebar">Sidebar</button>
-                  <button class="seg-btn ${navPref === 'bottom' ? 'active' : ''}" data-nav="bottom">Bottom</button>
-                </div>
-              </div>
-            </div>
-          </section>
-
-          <section class="settings-section">
-            <h2>Account</h2>
-            <div class="settings-list">
-              <button class="settings-row danger" id="set-logout">
-                <span class="icon">${iconSvg('logOut', 18)}</span>
-                <div class="body">
-                  <div class="title">Ausloggen</div>
-                </div>
-              </button>
-            </div>
-          </section>
-
+          </div>
         </div>
-      </main>
+      </section>
+
+      <section class="settings-section">
+        <h2>Profil</h2>
+        <div class="settings-list">
+          <button class="settings-row" id="set-edit-profile">
+            <span class="icon">${iconSvg('edit', 18)}</span>
+            <div class="body">
+              <div class="title">Profil bearbeiten</div>
+              <div class="desc">Display-Name, Bio, Header, Links</div>
+            </div>
+            <span class="chev">${iconSvg('chevR', 14)}</span>
+          </button>
+        </div>
+      </section>
+
+      <section class="settings-section">
+        <h2>Privacy</h2>
+        <div class="settings-list">
+          <div class="settings-row" style="cursor:default;flex-direction:column;align-items:stretch;">
+            <div style="display:flex;align-items:center;gap:12px;width:100%;">
+              <span class="icon">${iconSvg('lock', 18)}</span>
+              <div class="body">
+                <div class="title">Profil-Sichtbarkeit</div>
+                <div class="desc">Wer dein Profil und deine Posts sehen darf.</div>
+              </div>
+            </div>
+            <div class="seg" style="margin-top:12px;" id="privacy-seg">
+              <button class="seg-btn ${profilePrivacy === 'public' ? 'active' : ''}" data-pv="public">🌍 Öffentlich</button>
+              <button class="seg-btn ${profilePrivacy === 'followers' ? 'active' : ''}" data-pv="followers">👥 Follower</button>
+              <button class="seg-btn ${profilePrivacy === 'private' ? 'active' : ''}" data-pv="private">🔒 Privat</button>
+            </div>
+          </div>
+          <button class="settings-row" id="set-blocks">
+            <span class="icon">${iconSvg('ban', 18)}</span>
+            <div class="body">
+              <div class="title">Blockierte Nutzer</div>
+              <div class="desc">Verwalte, wen du blockiert hast.</div>
+            </div>
+            <span class="chev">${iconSvg('chevR', 14)}</span>
+          </button>
+        </div>
+      </section>
+
+      <section class="settings-section">
+        <h2>Layout</h2>
+        <div class="settings-list">
+          <div class="settings-row" style="cursor:default;flex-direction:column;align-items:stretch;">
+            <div style="display:flex;align-items:center;gap:12px;width:100%;">
+              <span class="icon">${iconSvg('layout', 18)}</span>
+              <div class="body">
+                <div class="title">Navigation</div>
+                <div class="desc">Wo soll die Hauptnavigation erscheinen?</div>
+              </div>
+            </div>
+            <div class="seg" style="margin-top:12px;" id="nav-seg">
+              <button class="seg-btn ${navPref === 'auto' ? 'active' : ''}" data-nav="auto">Auto</button>
+              <button class="seg-btn ${navPref === 'sidebar' ? 'active' : ''}" data-nav="sidebar">Sidebar</button>
+              <button class="seg-btn ${navPref === 'bottom' ? 'active' : ''}" data-nav="bottom">Bottom</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="settings-section">
+        <h2>Account</h2>
+        <div class="settings-list">
+          <button class="settings-row danger" id="set-logout">
+            <span class="icon">${iconSvg('logOut', 18)}</span>
+            <div class="body">
+              <div class="title">Ausloggen</div>
+            </div>
+          </button>
+        </div>
+      </section>
+
     </div>
 
-    <div id="blocks-host"></div>
-  `
+    <div id="blocks-host"></div>`)
 
   // Globaler Header
   renderGlobalHeader(profile, { navigate, openComposer, toggleNotif }, {

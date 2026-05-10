@@ -12,7 +12,7 @@ import { openStoryViewer, openRepostModal } from './feed.page.js'
 import { initGridCols } from '../grid-utils.js'
 import { renderGridControls } from '../grid-controls.js'
 import { escapeHtml, shuffleArray, buildHeaderStyle, buildPatternStyle, buildMusicEmbed, iconSvg, profileHeaderTone } from '../utils.js'
-import { shellHtml, wireShellNav, applyNavPref, renderGlobalHeader, setGlobalHeaderTone, registerHeaderScrollListener } from '../shell.js'
+import { updateShellContent, updateActiveNav, wireShellNav, applyNavPref, renderGlobalHeader, setGlobalHeaderTone, registerHeaderScrollListener } from '../shell.js'
 
 /**
  * Zeigt eine Profilseite.
@@ -21,23 +21,23 @@ import { shellHtml, wireShellNav, applyNavPref, renderGlobalHeader, setGlobalHea
  */
 export async function showProfilePage(username, ctx) {
   const { navigate } = ctx
-  const app = document.querySelector('#app')
 
   // Body-Klassen für globalen Header
   document.body.classList.add('has-global-header', 'profile-page')
   applyNavPref()
 
-  app.innerHTML = `<div style="background:#0a0a0a;min-height:100vh;display:flex;align-items:center;justify-content:center;color:#444;font-size:14px;">Lädt...</div>`
+  updateActiveNav('profile')
+  updateShellContent(`<div style="background:#0a0a0a;min-height:100vh;display:flex;align-items:center;justify-content:center;color:#444;font-size:14px;">Lädt...</div>`)
 
   const session = await getSession()
   const currentUserId = session?.user?.id || null
   const profile = await getProfileByUsername(username)
 
   if (!profile) {
-    app.innerHTML = `<div style="background:#0a0a0a;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;">
+    updateShellContent(`<div style="background:#0a0a0a;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;">
       <p style="color:#555;font-size:14px;">Profil nicht gefunden</p>
       <button onclick="history.back()" style="padding:8px 20px;background:transparent;color:#666;border:1px solid #333;border-radius:8px;cursor:pointer;font-size:13px;">Zurück</button>
-    </div>`
+    </div>`)
     return
   }
 
@@ -58,11 +58,11 @@ export async function showProfilePage(username, ctx) {
   let following = followState === 'accepted'
 
   if (iAmBlocked) {
-    app.innerHTML = `<div style="background:#0a0a0a;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:24px;">
+    updateShellContent(`<div style="background:#0a0a0a;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:24px;">
       <div style="font-size:42px;">🚫</div>
       <p style="color:#555;font-size:14px;text-align:center;">Profil nicht verfügbar.</p>
       <button onclick="history.back()" style="padding:8px 20px;background:transparent;color:#666;border:1px solid #333;border-radius:8px;cursor:pointer;font-size:13px;">Zurück</button>
-    </div>`
+    </div>`)
     return
   }
 
@@ -125,11 +125,8 @@ export async function showProfilePage(username, ctx) {
   const heroBtnColor = tone === 'light' ? '#111' : '#fff'
   const heroBtnBorder = tone === 'light' ? 'rgba(0,0,0,0.15)' : 'rgba(255,255,255,0.2)'
 
-  app.innerHTML = `
-    <div class="app-shell">
-      ${shellHtml('profile', profile)}
-      <main class="app-main">
-        <div style="background:#0a0a0a;min-height:100vh;color:#fff;">
+  updateShellContent(`
+    <div style="background:#0a0a0a;min-height:100vh;color:#fff;">
 
       <!-- Hero Header (kein padding-top — globaler Header überlagert) -->
       <div style="position:relative;width:100%;height:300px;overflow:hidden;${headerStyle}">
@@ -216,8 +213,6 @@ export async function showProfilePage(username, ctx) {
         </div>
       `}
       </div>
-    </main>
-    </div>
 
     <!-- Edit Modal -->
     <div id="edit-modal" style="display:none;position:fixed;inset:0;z-index:200;background:rgba(0,0,0,0.92);overflow-y:auto;">
@@ -321,7 +316,7 @@ export async function showProfilePage(username, ctx) {
         <button id="board-save" style="width:100%;padding:12px;background:#fff;color:#000;border:none;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;">Board erstellen</button>
         <p id="board-msg" style="color:#555;font-size:12px;text-align:center;margin-top:10px;min-height:16px;"></p>
       </div>
-    </div>`
+    </div>`)
 
   // ── Globaler Header (Profil-Modus) ───────────────────────────────────────────
   renderGlobalHeader(profile, { navigate }, {

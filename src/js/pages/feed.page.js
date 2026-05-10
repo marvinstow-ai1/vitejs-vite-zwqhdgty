@@ -1,5 +1,5 @@
 import { supabase } from '../supabase.js'
-import { shellHtml, wireShellNav, applyNavPref, refreshUnreadBadge, renderGlobalHeader, refreshGlobalHeaderBadge } from '../shell.js'
+import { updateShellContent, updateActiveNav, wireShellNav, applyNavPref, refreshUnreadBadge, renderGlobalHeader, refreshGlobalHeaderBadge } from '../shell.js'
 import { iconSvg, escapeHtml, detectMediaType, renderMediaEl, timeAgo } from '../utils.js'
 import { initGridCols } from '../grid-utils.js'
 import { renderGridControls } from '../grid-controls.js'
@@ -30,65 +30,61 @@ export async function showFeed(profile, ctx) {
   document.body.classList.add('has-global-header')
   document.body.classList.remove('profile-page')
 
-  document.querySelector('#app').innerHTML = `
-    <div class="app-shell">
-      ${shellHtml('home', profile)}
-      <main class="app-main">
-        <!-- Notif Dropdown (global, außerhalb topbar) -->
-        <div id="notif-dropdown" style="display:none;position:fixed;right:12px;top:60px;width:320px;background:var(--panel);border:1px solid var(--border);border-radius:var(--radius-md);overflow:hidden;z-index:110;box-shadow:var(--shadow-elev);backdrop-filter:blur(24px);">
-          <div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;">
-            <span style="font-size:13px;font-weight:600;color:#fff;">Benachrichtigungen</span>
-            <button id="notif-mark-read" style="background:none;border:none;cursor:pointer;font-size:11px;color:var(--text-mute);">Alle gelesen</button>
-          </div>
-          <div id="notif-list" style="max-height:340px;overflow-y:auto;"></div>
-        </div>
-
-        <div id="story-bar" style="display:flex;gap:12px;padding:14px 16px;overflow-x:auto;border-bottom:1px solid var(--border);scrollbar-width:none;-webkit-overflow-scrolling:touch;"></div>
-
-        <!-- NEU: Discovery-Kacheln -->
-        <div class="discovery-tiles">
-          <button class="discovery-tile" data-discovery="personal">
-            <div class="discovery-tile-icon">✨</div>
-            <div class="discovery-tile-content">
-              <div class="discovery-tile-title">Für dich</div>
-              <div class="discovery-tile-desc">Beiträge, die zu dir passen</div>
-            </div>
-            <div class="discovery-tile-chev">›</div>
-          </button>
-          <button class="discovery-tile" data-discovery="boards">
-            <div class="discovery-tile-icon discovery-tile-icon--boards">
-              <div class="board-preview-grid">
-                <div class="board-preview-cell" style="background:#333"></div>
-                <div class="board-preview-cell" style="background:#444"></div>
-                <div class="board-preview-cell" style="background:#555"></div>
-                <div class="board-preview-cell" style="background:#666"></div>
-                <div class="board-preview-cell" style="background:#777"></div>
-                <div class="board-preview-cell" style="background:#888"></div>
-                <div class="board-preview-cell" style="background:#999"></div>
-                <div class="board-preview-cell" style="background:#aaa"></div>
-                <div class="board-preview-cell" style="background:#bbb"></div>
-              </div>
-            </div>
-            <div class="discovery-tile-content">
-              <div class="discovery-tile-title">Board-Vorschläge</div>
-              <div class="discovery-tile-desc">Entdecke neue Boards</div>
-            </div>
-            <div class="discovery-tile-chev">›</div>
-          </button>
-        </div>
-
-        <!-- Grid Controls -->
-        <div id="feed-grid-controls" class="grid-controls"></div>
-
-        <div class="feed-wrap">
-          <div id="feed-active-filter" class="hidden" style="display:flex;align-items:center;gap:8px;padding:8px 4px 12px;color:#888;font-size:12px;"></div>
-          <div id="feed-grid" class="unified-grid"></div>
-          <div id="feed-state" class="feed-state hidden"></div>
-        </div>
-      </main>
+  updateActiveNav('home')
+  updateShellContent(`
+    <!-- Notif Dropdown (global, außerhalb topbar) -->
+    <div id="notif-dropdown" style="display:none;position:fixed;right:12px;top:60px;width:320px;background:var(--panel);border:1px solid var(--border);border-radius:var(--radius-md);overflow:hidden;z-index:110;box-shadow:var(--shadow-elev);backdrop-filter:blur(24px);">
+      <div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;">
+        <span style="font-size:13px;font-weight:600;color:#fff;">Benachrichtigungen</span>
+        <button id="notif-mark-read" style="background:none;border:none;cursor:pointer;font-size:11px;color:var(--text-mute);">Alle gelesen</button>
+      </div>
+      <div id="notif-list" style="max-height:340px;overflow-y:auto;"></div>
     </div>
 
-    <!-- Comments Modal -->
+    <div id="story-bar" style="display:flex;gap:12px;padding:14px 16px;overflow-x:auto;border-bottom:1px solid var(--border);scrollbar-width:none;-webkit-overflow-scrolling:touch;"></div>
+
+    <!-- NEU: Discovery-Kacheln -->
+    <div class="discovery-tiles">
+      <button class="discovery-tile" data-discovery="personal">
+        <div class="discovery-tile-icon">✨</div>
+        <div class="discovery-tile-content">
+          <div class="discovery-tile-title">Für dich</div>
+          <div class="discovery-tile-desc">Beiträge, die zu dir passen</div>
+        </div>
+        <div class="discovery-tile-chev">›</div>
+      </button>
+      <button class="discovery-tile" data-discovery="boards">
+        <div class="discovery-tile-icon discovery-tile-icon--boards">
+          <div class="board-preview-grid">
+            <div class="board-preview-cell" style="background:#333"></div>
+            <div class="board-preview-cell" style="background:#444"></div>
+            <div class="board-preview-cell" style="background:#555"></div>
+            <div class="board-preview-cell" style="background:#666"></div>
+            <div class="board-preview-cell" style="background:#777"></div>
+            <div class="board-preview-cell" style="background:#888"></div>
+            <div class="board-preview-cell" style="background:#999"></div>
+            <div class="board-preview-cell" style="background:#aaa"></div>
+            <div class="board-preview-cell" style="background:#bbb"></div>
+          </div>
+        </div>
+        <div class="discovery-tile-content">
+          <div class="discovery-tile-title">Board-Vorschläge</div>
+          <div class="discovery-tile-desc">Entdecke neue Boards</div>
+        </div>
+        <div class="discovery-tile-chev">›</div>
+      </button>
+    </div>
+
+    <!-- Grid Controls -->
+    <div id="feed-grid-controls" class="grid-controls"></div>
+
+    <div class="feed-wrap">
+      <div id="feed-active-filter" class="hidden" style="display:flex;align-items:center;gap:8px;padding:8px 4px 12px;color:#888;font-size:12px;"></div>
+      <div id="feed-grid" class="unified-grid"></div>
+      <div id="feed-state" class="feed-state hidden"></div>
+    </div>
+
+    <!-- Comments Modal (innerhalb <main>, position:fixed funktioniert trotzdem) -->
     <div id="comments-modal" style="display:none;position:fixed;inset:0;z-index:100;background:rgba(0,0,0,0.88);align-items:center;justify-content:center;">
       <div style="background:#111;border:1px solid #222;border-radius:14px;width:100%;max-width:500px;max-height:90vh;display:flex;flex-direction:column;margin:12px;">
         <div style="padding:14px 20px;border-bottom:1px solid #1f1f1f;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">
@@ -102,7 +98,7 @@ export async function showFeed(profile, ctx) {
           <button id="comment-submit" style="padding:9px 16px;background:#fff;color:#000;border:none;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;white-space:nowrap;">Senden</button>
         </div>
       </div>
-    </div>`
+    </div>`)
 
   // Globaler Header rendern
   const ghEl = renderGlobalHeader(profile, {

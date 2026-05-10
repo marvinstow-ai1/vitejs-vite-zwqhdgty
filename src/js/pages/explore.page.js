@@ -1,4 +1,4 @@
-import { shellHtml, wireShellNav, applyNavPref, refreshUnreadBadge, renderGlobalHeader, refreshGlobalHeaderBadge } from '../shell.js'
+import { updateShellContent, updateActiveNav, wireShellNav, applyNavPref, refreshUnreadBadge, renderGlobalHeader, refreshGlobalHeaderBadge } from '../shell.js'
 import { iconSvg, escapeHtml, detectMediaType, renderMediaEl, timeAgo } from '../utils.js'
 import { initGridCols } from '../grid-utils.js'
 import { renderGridControls } from '../grid-controls.js'
@@ -50,65 +50,61 @@ export async function showExplorePage(profile, nav) {
   exploreLoading = false
   exploreHasMore = true
 
-  document.querySelector('#app').innerHTML = `
-    <div class="app-shell">
-      ${shellHtml('explore', profile)}
-      <main class="app-main">
-        <!-- Mood-Filter Chips -->
-        <div id="explore-moods" style="display:flex;gap:8px;padding:10px 14px;overflow-x:auto;scrollbar-width:none;border-bottom:1px solid var(--border);-webkit-overflow-scrolling:touch;flex-shrink:0;">
-          <div style="color:#444;font-size:12px;padding:6px 0;align-self:center;">Lädt…</div>
+  updateActiveNav('explore')
+  updateShellContent(`
+    <!-- Mood-Filter Chips -->
+    <div id="explore-moods" style="display:flex;gap:8px;padding:10px 14px;overflow-x:auto;scrollbar-width:none;border-bottom:1px solid var(--border);-webkit-overflow-scrolling:touch;flex-shrink:0;">
+      <div style="color:#444;font-size:12px;padding:6px 0;align-self:center;">Lädt…</div>
+    </div>
+
+    <!-- Suggested Users -->
+    <div id="explore-suggestions" style="display:none;padding:14px 14px 0;"></div>
+
+    <!-- NEU: Discovery-Kacheln -->
+    <div class="discovery-tiles">
+      <button class="discovery-tile" data-discovery="personal">
+        <div class="discovery-tile-icon">✨</div>
+        <div class="discovery-tile-content">
+          <div class="discovery-tile-title">Für dich</div>
+          <div class="discovery-tile-desc">Beiträge, die zu dir passen</div>
         </div>
-
-        <!-- Suggested Users -->
-        <div id="explore-suggestions" style="display:none;padding:14px 14px 0;"></div>
-
-        <!-- NEU: Discovery-Kacheln -->
-        <div class="discovery-tiles">
-          <button class="discovery-tile" data-discovery="personal">
-            <div class="discovery-tile-icon">✨</div>
-            <div class="discovery-tile-content">
-              <div class="discovery-tile-title">Für dich</div>
-              <div class="discovery-tile-desc">Beiträge, die zu dir passen</div>
-            </div>
-            <div class="discovery-tile-chev">›</div>
-          </button>
-          <button class="discovery-tile" data-discovery="boards">
-            <div class="discovery-tile-icon discovery-tile-icon--boards">
-              <div class="board-preview-grid">
-                <div class="board-preview-cell" style="background:#333"></div>
-                <div class="board-preview-cell" style="background:#444"></div>
-                <div class="board-preview-cell" style="background:#555"></div>
-                <div class="board-preview-cell" style="background:#666"></div>
-                <div class="board-preview-cell" style="background:#777"></div>
-                <div class="board-preview-cell" style="background:#888"></div>
-                <div class="board-preview-cell" style="background:#999"></div>
-                <div class="board-preview-cell" style="background:#aaa"></div>
-                <div class="board-preview-cell" style="background:#bbb"></div>
-              </div>
-            </div>
-            <div class="discovery-tile-content">
-              <div class="discovery-tile-title">Board-Vorschläge</div>
-              <div class="discovery-tile-desc">Entdecke neue Boards</div>
-            </div>
-            <div class="discovery-tile-chev">›</div>
-          </button>
+        <div class="discovery-tile-chev">›</div>
+      </button>
+      <button class="discovery-tile" data-discovery="boards">
+        <div class="discovery-tile-icon discovery-tile-icon--boards">
+          <div class="board-preview-grid">
+            <div class="board-preview-cell" style="background:#333"></div>
+            <div class="board-preview-cell" style="background:#444"></div>
+            <div class="board-preview-cell" style="background:#555"></div>
+            <div class="board-preview-cell" style="background:#666"></div>
+            <div class="board-preview-cell" style="background:#777"></div>
+            <div class="board-preview-cell" style="background:#888"></div>
+            <div class="board-preview-cell" style="background:#999"></div>
+            <div class="board-preview-cell" style="background:#aaa"></div>
+            <div class="board-preview-cell" style="background:#bbb"></div>
+          </div>
         </div>
-
-        <!-- Grid Controls -->
-        <div id="explore-grid-controls" class="grid-controls"></div>
-
-        <!-- Post Grid (Unified Grid) -->
-        <div id="explore-grid" class="unified-grid"></div>
-
-        <!-- Load More -->
-        <div id="explore-more" style="display:none;padding:20px;text-align:center;">
-          <button id="btn-load-more" class="btn" style="min-width:140px;">Mehr laden</button>
+        <div class="discovery-tile-content">
+          <div class="discovery-tile-title">Board-Vorschläge</div>
+          <div class="discovery-tile-desc">Entdecke neue Boards</div>
         </div>
+        <div class="discovery-tile-chev">›</div>
+      </button>
+    </div>
 
-        <!-- Empty / Error State -->
-        <div id="explore-state" style="display:none;padding:60px 24px;text-align:center;color:#444;font-size:14px;"></div>
-      </main>
-    </div>`
+    <!-- Grid Controls -->
+    <div id="explore-grid-controls" class="grid-controls"></div>
+
+    <!-- Post Grid (Unified Grid) -->
+    <div id="explore-grid" class="unified-grid"></div>
+
+    <!-- Load More -->
+    <div id="explore-more" style="display:none;padding:20px;text-align:center;">
+      <button id="btn-load-more" class="btn" style="min-width:140px;">Mehr laden</button>
+    </div>
+
+    <!-- Empty / Error State -->
+    <div id="explore-state" style="display:none;padding:60px 24px;text-align:center;color:#444;font-size:14px;"></div>`)
 
   // Globaler Header
   renderGlobalHeader(profile, nav, {
