@@ -78,6 +78,38 @@ export async function showExplorePage(profile, nav) {
         <!-- Suggested Users -->
         <div id="explore-suggestions" style="display:none;padding:14px 14px 0;"></div>
 
+        <!-- NEU: Discovery-Kacheln -->
+        <div class="discovery-tiles">
+          <button class="discovery-tile" data-discovery="personal">
+            <div class="discovery-tile-icon">✨</div>
+            <div class="discovery-tile-content">
+              <div class="discovery-tile-title">Für dich</div>
+              <div class="discovery-tile-desc">Beiträge, die zu dir passen</div>
+            </div>
+            <div class="discovery-tile-chev">›</div>
+          </button>
+          <button class="discovery-tile" data-discovery="boards">
+            <div class="discovery-tile-icon discovery-tile-icon--boards">
+              <div class="board-preview-grid">
+                <div class="board-preview-cell" style="background:#333"></div>
+                <div class="board-preview-cell" style="background:#444"></div>
+                <div class="board-preview-cell" style="background:#555"></div>
+                <div class="board-preview-cell" style="background:#666"></div>
+                <div class="board-preview-cell" style="background:#777"></div>
+                <div class="board-preview-cell" style="background:#888"></div>
+                <div class="board-preview-cell" style="background:#999"></div>
+                <div class="board-preview-cell" style="background:#aaa"></div>
+                <div class="board-preview-cell" style="background:#bbb"></div>
+              </div>
+            </div>
+            <div class="discovery-tile-content">
+              <div class="discovery-tile-title">Board-Vorschläge</div>
+              <div class="discovery-tile-desc">Entdecke neue Boards</div>
+            </div>
+            <div class="discovery-tile-chev">›</div>
+          </button>
+        </div>
+
         <!-- Post Grid (CSS-Grid via injected style) -->
         <div id="explore-grid"></div>
 
@@ -108,6 +140,21 @@ export async function showExplorePage(profile, nav) {
   _loadMoodChips(profile, nav)
   _loadSuggestions(profile, nav)
   await _loadExploreGrid(profile, nav, true)
+
+  // Discovery-Tiles Events
+  document.querySelector('.discovery-tiles')?.addEventListener('click', (e) => {
+    const tile = e.target.closest('.discovery-tile');
+    if (!tile) return;
+    const type = tile.dataset.discovery;
+    if (type === 'personal') {
+      // TODO: Personalisierten Feed laden (Algorithmus Phase 9/10)
+      tile.classList.toggle('discovery-tile--active');
+      document.querySelector('#explore-grid').innerHTML = '<div class="feed-state">✨ Personalisierte Ansicht – kommt bald!</div>';
+    } else if (type === 'boards') {
+      // TODO: Board-Vorschläge laden
+      window.location.hash = '#/boards/suggested';
+    }
+  });
 
   document.querySelector('#btn-load-more')?.addEventListener('click', () =>
     _loadExploreGrid(profile, nav, false)

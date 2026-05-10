@@ -103,6 +103,7 @@
 - [x] Story-Viewer: null media_url → Overlay statt broken img
 - [x] Feed-Verhalten für eingeloggte User final definieren (Feed live mit Posts + Composer)
 - [x] Explore vollständig implementiert: Masonry-Grid, Mood-Filter, Cursor-Pagination, Like/Repost/Comment, Suggested Users (2026-05-08)
+- [x] Discovery-Tiles auf Feed + Explore: "Für dich" + "Board-Vorschläge" mit 3×3 Preview-Grid (2026-05-10)
 - [ ] Profilseite entkoppeln: Header / Boards / Stories / Reposts / Social Actions
 - [ ] Board-Seite modularisieren
 - [ ] Story-Workflow bereinigen
@@ -302,3 +303,4 @@
 | 2026-05-08 | RLS + Storage | PR #2 gemerged, 0001/0002/0003 appliziert, 12 Flows getestet |
 | 2026-05-08 | Follow-Request-UI | Phase 6: Pending-State, Withdraw, Accept/Reject in Notifications |
 | 2026-05-08 | Explore-Seite | Phase 4: Masonry-Grid, Mood-Filter-Chips, Cursor-Pagination, Suggested Users, Like/Repost/Comment |
+| 2026-05-10 | Discovery-Tiles | Phase 4: "Für dich"-Tile + "Board-Vorschläge"-Tile mit 3×3 Mini-Grid auf Feed + Explore Seite |

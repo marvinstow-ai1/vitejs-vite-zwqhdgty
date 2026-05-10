@@ -614,3 +614,137 @@ body[data-nav="bottom"] .app-main { padding-bottom: 96px; }
 
 /* legacy fallbacks the rest of the inline style code still relies on */
 input::placeholder, textarea::placeholder { color: rgba(255,255,255,.35); }
+
+/* =============================================
+   Discovery Tiles (Für dich / Board-Vorschläge)
+   ============================================= */
+.discovery-tiles {
+  display: flex;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border, #2a2a2a);
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.discovery-tiles::-webkit-scrollbar {
+  display: none;
+}
+
+.discovery-tile {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex: 1;
+  min-width: 0;
+  padding: 16px 18px;
+  background: var(--bg-elev, #1a1a1a);
+  border: 1px solid var(--border, #2a2a2a);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: left;
+  color: inherit;
+  font: inherit;
+  line-height: 1.3;
+}
+
+.discovery-tile:hover {
+  background: var(--bg-elev-hover, #222);
+  border-color: var(--accent, #555);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+}
+
+.discovery-tile:active {
+  transform: translateY(0);
+}
+
+.discovery-tile--active {
+  border-color: var(--accent, #888);
+  background: var(--bg-elev-active, #1e1e2a);
+}
+
+.discovery-tile-icon {
+  flex-shrink: 0;
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  border-radius: 10px;
+  background: rgba(255,255,255,0.05);
+}
+
+.discovery-tile-icon--boards {
+  padding: 4px;
+  width: 48px;
+  height: 48px;
+}
+
+.discovery-tile-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.discovery-tile-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text, #eee);
+  margin-bottom: 2px;
+}
+
+.discovery-tile-desc {
+  font-size: 12px;
+  color: var(--text-secondary, #888);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.discovery-tile-chev {
+  flex-shrink: 0;
+  font-size: 18px;
+  color: var(--text-secondary, #555);
+  transition: transform 0.2s ease;
+}
+
+.discovery-tile:hover .discovery-tile-chev {
+  transform: translateX(3px);
+  color: var(--text, #eee);
+}
+
+/* Board Preview Grid (3x3) */
+.board-preview-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(3, 1fr);
+  gap: 1.5px;
+  width: 100%;
+  height: 100%;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.board-preview-cell {
+  border-radius: 1px;
+  aspect-ratio: 1;
+  background-size: cover;
+  background-position: center;
+  background-color: #2a2a2a;
+}
+
+/* Responsive: Auf kleinen Screens untereinander statt nebeneinander */
+@media (max-width: 500px) {
+  .discovery-tiles {
+    flex-direction: column;
+    gap: 10px;
+    padding: 12px 14px;
+  }
+  
+  .discovery-tile {
+    padding: 14px 16px;
+  }
+}
