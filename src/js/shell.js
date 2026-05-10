@@ -49,6 +49,7 @@ export function registerHeaderScrollListener(fn) {
  *   showNotif?: boolean,
  *   showCompose?: boolean,
  *   profileActions?: string|null,
+ *   profile?: object|null,
  * }} opts
  */
 export function updateGlobalHeader(opts = {}) {
@@ -60,6 +61,7 @@ export function updateGlobalHeader(opts = {}) {
     showNotif = false,
     showCompose = false,
     profileActions = null,
+    profile = null,
   } = opts
 
   const header = document.querySelector('#global-header')
@@ -114,6 +116,26 @@ export function updateGlobalHeader(opts = {}) {
 
   // Wire back button (history.back ist immer gleich)
   header.querySelector('#gh-back')?.addEventListener('click', () => history.back())
+
+  // Hintergrundbild aktualisieren, wenn ein Profil übergeben wurde
+  updateGlobalHeaderBg(profile)
+}
+
+/**
+ * Aktualisiert das Hintergrundbild im Global Header basierend auf dem Profil.
+ * @param {object|null} profile
+ */
+export function updateGlobalHeaderBg(profile) {
+  const bg = document.querySelector('#gh-bg')
+  const img = document.querySelector('#gh-bg-img')
+  if (!bg || !img) return
+
+  if (profile?.header_image_url && profile?.header_type === 'image') {
+    bg.style.display = 'block'
+    img.src = profile.header_image_url
+  } else {
+    bg.style.display = 'none'
+  }
 }
 
 /**
@@ -339,6 +361,10 @@ export function renderShell(activeKey, profile) {
     <div class="app-shell">
       <!-- Persistenter Global Header -->
       <header id="global-header" class="global-header global-header--auto">
+        <div id="gh-bg" class="gh-background" style="display:none;">
+          <img id="gh-bg-img" src="" alt="" style="width:100%;height:100%;object-fit:cover;">
+          <div class="gh-bg-fade"></div>
+        </div>
         <div class="gh-left">
           <button class="gh-brand" id="gh-brand" aria-label="Home">
             <span class="gh-brand-text">Marvin's Place</span>
@@ -379,9 +405,21 @@ export function renderShell(activeKey, profile) {
  */
 export function updateShellContent(html) {
   const main = document.querySelector('#app-main')
-  if (main) {
+  if (!main) return
+
+  // Fade out
+  main.style.opacity = '0'
+  main.style.transform = 'translateY(8px)'
+
+  setTimeout(() => {
     main.innerHTML = html
-  }
+    // Fade in
+    requestAnimationFrame(() => {
+      main.style.transition = 'opacity .25s ease, transform .25s ease'
+      main.style.opacity = '1'
+      main.style.transform = 'translateY(0)'
+    })
+  }, 150)
 }
 
 /**

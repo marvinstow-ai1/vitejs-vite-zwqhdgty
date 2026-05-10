@@ -41,7 +41,7 @@ export async function showFeed(profile, ctx) {
       <div id="notif-list" style="max-height:min(340px, 50vh);overflow-y:auto;"></div>
     </div>
 
-    <div id="story-bar" style="display:flex;gap:12px;padding:14px 16px;overflow-x:auto;border-bottom:1px solid var(--border);scrollbar-width:none;-webkit-overflow-scrolling:touch;"></div>
+    <div id="story-bar" style="display:none;gap:12px;padding:14px 16px;overflow-x:auto;border-bottom:1px solid var(--border);scrollbar-width:none;-webkit-overflow-scrolling:touch;"></div>
 
     <!-- NEU: Discovery-Kacheln -->
     <div class="discovery-tiles">
@@ -106,6 +106,7 @@ export async function showFeed(profile, ctx) {
     showSearch: true,
     showNotif: true,
     showCompose: true,
+    profile,
   })
 
   loadStoryBar(profile.id)

@@ -112,6 +112,7 @@ export async function showExplorePage(profile, nav) {
     title: 'Explore',
     showSearch: true,
     showCompose: true,
+    profile,
   })
 
   wireShellNav(profile, nav)

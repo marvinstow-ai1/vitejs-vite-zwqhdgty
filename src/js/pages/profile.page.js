@@ -130,10 +130,8 @@ export async function showProfilePage(username, ctx) {
     <div style="background:#0a0a0a;min-height:100vh;color:#fff;">
 
       <!-- Hero Header (kein padding-top — globaler Header überlagert) -->
+      <!-- Das Header-Bild wird jetzt global im Global Header angezeigt -->
       <div style="position:relative;width:100%;height:200px;overflow:hidden;${headerStyle}">
-        ${profile.header_type === 'image' && profile.header_image_url
-          ? `<img src="${profile.header_image_url}" alt="" style="position:absolute;width:100%;height:100%;object-fit:cover;transform:translate(${(profile.header_image_position?.x || 50) - 50}%, ${(profile.header_image_position?.y || 50) - 50}%) scale(${profile.header_image_position?.zoom || 1});transform-origin:center;" />`
-          : ''}
         ${profile.header_type === 'pattern'
           ? `<div style="position:absolute;inset:0;${buildPatternStyle(profile.header_pattern)}opacity:0.25;"></div>`
           : ''}
@@ -323,6 +321,7 @@ export async function showProfilePage(username, ctx) {
     showSearch: true,
     showBack: true,
     profileActions: profileActionsHtml,
+    profile,
   })
 
   // ── Shell-Navigation verdrahten (Sidebar + Bottombar) ────────────────────────

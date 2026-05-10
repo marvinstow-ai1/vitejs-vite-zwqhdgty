@@ -102,7 +102,15 @@ a { color: inherit; text-decoration: none; }
   display: grid;
   grid-template-columns: 1fr;
 }
-.app-main { min-width: 0; padding-bottom: 24px; }
+.app-main {
+  min-width: 0;
+  padding-bottom: 24px;
+  transition: opacity .25s ease, transform .25s ease;
+}
+.app-main-transitioning {
+  opacity: 0;
+  transform: translateY(8px);
+}
 
 /* Mit globalem Header: app-main bekommt padding-top */
 body.has-global-header .app-main { padding-top: 52px; }
@@ -186,14 +194,39 @@ body.has-global-header.profile-page .app-main { padding-top: 0; }
  *   --light : Leicht getönt, dunkle Schrift — Profil mit hellem Header
  */
 .global-header {
-  position: fixed; top: 0; left: 0; right: 0;
+  position: relative;
   z-index: 100;
   height: 52px;
+  min-height: 200px;
   display: flex; align-items: center;
   padding: 0 12px;
   gap: 8px;
   transition: background .35s ease, color .35s ease, border-color .35s ease, backdrop-filter .35s ease;
   will-change: background, color;
+}
+
+.gh-background {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 200px;
+  overflow: hidden;
+  z-index: -1;
+}
+
+.gh-background img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.gh-bg-fade {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 80px;
+  background: linear-gradient(to bottom, transparent 30%, rgba(10,10,10,0.95));
 }
 
 /* ── auto (Standard) ── */
