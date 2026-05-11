@@ -90,8 +90,7 @@ export function renderMediaEl(mediaUrl, mediaType, opts = {}) {
   const { width = '100%', maxHeight = '', cursor = 'pointer', classes = '', dataset = '' } = opts
   const style = `width:${width};display:block;${maxHeight ? `max-height:${maxHeight};object-fit:cover;` : ''}${cursor ? `cursor:${cursor};` : ''}`
   if (mediaType === 'video' || mediaType === 'gif') {
-    // preload="none" defers network fetch until the IntersectionObserver calls .play()
-    return `<video src="${mediaUrl}" ${classes ? `class="${classes}"` : ''} ${dataset} style="${style}" autoplay loop muted playsinline preload="none" onerror="this.style.display='none'"></video>`
+    return `<video src="${mediaUrl}" ${classes ? `class="${classes}"` : ''} ${dataset} style="${style}" loop muted playsinline preload="none" onerror="this.style.display='none'"></video>`
   }
   if (mediaType === 'youtube') {
     const embedUrl = getYouTubeEmbedUrl(mediaUrl)
