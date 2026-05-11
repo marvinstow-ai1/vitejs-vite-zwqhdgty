@@ -7,11 +7,6 @@ let _tyStart = 0
 
 // ── Public API ────────────────────────────────────────────────────────────────
 
-/**
- * Attach lightbox click delegation to a stable container element.
- * Works for #feed-grid, #explore-grid, #board-content, etc.
- * @param {string|HTMLElement} containerSel
- */
 export function wireLightbox(containerSel) {
   const container = typeof containerSel === 'string'
     ? document.querySelector(containerSel)
@@ -54,14 +49,12 @@ export function closeLightbox() {
 
 function _cellToItem(cell) {
   if (cell.querySelector('iframe')) return null
-  // Feed / explore: data-media-url on inner wrapper
   const withData = cell.querySelector('[data-media-url]')
   if (withData?.dataset.mediaUrl) {
     const mt = withData.dataset.mediaType
     if (mt === 'youtube' || mt === 'instagram') return null
     return { mediaUrl: withData.dataset.mediaUrl, mediaType: mt }
   }
-  // Board / profile: img or video directly in cell
   const vid = cell.querySelector('video')
   if (vid) return { mediaUrl: vid.src || vid.currentSrc, mediaType: 'video' }
   const img = cell.querySelector('img')
@@ -71,34 +64,90 @@ function _cellToItem(cell) {
   return { mediaUrl: src, mediaType: isGif ? 'gif' : 'image' }
 }
 
+const glassBtn = [
+  'border:none;border-radius:50%;width:44px;height:44px;',
+  'color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;',
+  'background:rgba(255,255,255,.14);',
+  'backdrop-filter:blur(20px) saturate(1.6);-webkit-backdrop-filter:blur(20px) saturate(1.6);',
+  'border:1px solid rgba(255,255,255,.22);',
+  'box-shadow:0 4px 24px rgba(0,0,0,.35);',
+  'transition:background .15s;',
+].join('')
+
 function _render() {
   document.getElementById('_lb')?.remove()
   const item = _items[_idx]
   const hasPrev = _idx > 0
   const hasNext = _idx < _items.length - 1
-  const btnStyle = 'position:absolute;top:50%;transform:translateY(-50%);z-index:2;width:44px;height:44px;background:rgba(255,255,255,.12);border:none;border-radius:50%;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(8px);'
+  const isImg = item.mediaType !== 'video'
 
   const el = document.createElement('div')
   el.id = '_lb'
-  el.style.cssText = 'position:fixed;inset:0;z-index:600;background:rgba(0,0,0,.96);display:flex;align-items:center;justify-content:center;overscroll-behavior:contain;'
+  // Base background starts dark; the blurred image layer adds the color
+  el.style.cssText = 'position:fixed;inset:0;z-index:600;display:flex;align-items:center;justify-content:center;overscroll-behavior:contain;background:#000;'
 
   el.innerHTML = `
-    <button id="_lb-x" style="position:absolute;top:12px;right:12px;z-index:2;width:44px;height:44px;background:rgba(255,255,255,.12);border:none;border-radius:50%;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(8px);">
+    <!-- Blurred image background — adapts to photo colors -->
+    <div id="_lb-bg" style="
+      position:absolute;inset:-80px;z-index:0;pointer-events:none;
+      background:center/cover no-repeat;
+      filter:blur(48px) saturate(1.6) brightness(0.38);
+      transform:scale(1.08);
+      transition:background-image .3s ease;
+      ${isImg ? `background-image:url('${CSS.escape ? item.mediaUrl : item.mediaUrl}')` : ''}
+    "></div>
+    <!-- Subtle dark vignette on top of the blur -->
+    <div style="position:absolute;inset:0;z-index:1;pointer-events:none;
+      background:radial-gradient(ellipse at center, rgba(0,0,0,.18) 0%, rgba(0,0,0,.62) 100%);"></div>
+
+    <!-- Close -->
+    <button id="_lb-x" style="position:absolute;top:14px;right:14px;z-index:3;${glassBtn}">
       <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
     </button>
-    ${hasPrev ? `<button id="_lb-prev" style="${btnStyle}left:10px;">
+
+    <!-- Prev -->
+    ${hasPrev ? `<button id="_lb-prev" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);z-index:3;${glassBtn}">
       <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
     </button>` : ''}
-    ${hasNext ? `<button id="_lb-next" style="${btnStyle}right:10px;">
+
+    <!-- Next -->
+    ${hasNext ? `<button id="_lb-next" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);z-index:3;${glassBtn}">
       <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
     </button>` : ''}
-    <div id="_lb-media" style="display:flex;align-items:center;justify-content:center;width:100%;height:100%;padding:${hasPrev || hasNext ? '60px 72px' : '60px 20px'};box-sizing:border-box;">
-      ${_mediaHtml(item)}
-    </div>
-    ${_items.length > 1 ? `<div style="position:absolute;bottom:16px;left:50%;transform:translateX(-50%);color:rgba(255,255,255,.4);font-size:12px;letter-spacing:.05em;pointer-events:none;white-space:nowrap;">${_idx + 1} / ${_items.length}</div>` : ''}
+
+    <!-- Media -->
+    <div id="_lb-media" style="
+      position:relative;z-index:2;
+      display:flex;align-items:center;justify-content:center;
+      width:100%;height:100%;
+      padding:${hasPrev || hasNext ? '60px 72px' : '60px 20px'};
+      box-sizing:border-box;
+    ">${_mediaHtml(item)}</div>
+
+    <!-- Counter -->
+    ${_items.length > 1 ? `<div style="
+      position:absolute;bottom:18px;left:50%;transform:translateX(-50%);
+      z-index:3;pointer-events:none;white-space:nowrap;
+      padding:4px 12px;border-radius:999px;
+      background:rgba(255,255,255,.1);
+      backdrop-filter:blur(16px) saturate(1.4);-webkit-backdrop-filter:blur(16px) saturate(1.4);
+      border:1px solid rgba(255,255,255,.15);
+      color:rgba(255,255,255,.75);font-size:12px;font-weight:500;letter-spacing:.06em;
+    ">${_idx + 1} / ${_items.length}</div>` : ''}
   `
 
   document.body.appendChild(el)
+
+  // Wire background for images/gifs (set as CSS bg so it loads without flicker)
+  if (isImg) {
+    const bg = el.querySelector('#_lb-bg')
+    // Preload then apply to avoid flash
+    const probe = new Image()
+    probe.onload = () => { if (bg) bg.style.backgroundImage = `url('${item.mediaUrl}')` }
+    probe.src = item.mediaUrl
+    // Set immediately too — probe handles the race
+    if (bg) bg.style.backgroundImage = `url('${item.mediaUrl}')`
+  }
 
   el.addEventListener('click', e => { if (e.target === el || e.target.id === '_lb-media') closeLightbox() })
   document.getElementById('_lb-x').onclick = closeLightbox
@@ -123,7 +172,11 @@ function _render() {
 }
 
 function _mediaHtml(item) {
-  const s = 'max-width:100%;max-height:100%;object-fit:contain;display:block;border-radius:6px;'
+  const s = [
+    'max-width:100%;max-height:100%;object-fit:contain;display:block;',
+    'border-radius:10px;',
+    'box-shadow:0 24px 80px rgba(0,0,0,.7), 0 0 0 1px rgba(255,255,255,.06);',
+  ].join('')
   if (item.mediaType === 'video') {
     return `<video src="${item.mediaUrl}" loop playsinline preload="metadata" style="${s}"></video>`
   }
