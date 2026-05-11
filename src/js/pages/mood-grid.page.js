@@ -106,6 +106,9 @@ function _renderOverlay() {
         <button id="mg-confirm" class="mg-confirm-btn" disabled>
           ${iconSvg('spark', 16)} <span id="mg-confirm-label">Bestätigen &amp; speichern</span>
         </button>
+        <div id="mg-progress-bar" class="mg-progress-bar" aria-hidden="true">
+          <div id="mg-progress-fill" class="mg-progress-fill"></div>
+        </div>
       </div>
 
       <!-- Picker Modal -->
@@ -319,30 +322,35 @@ function _wireConfirm(overlay, userId, ctx) {
     _isExporting = true
     const btn = overlay.querySelector('#mg-confirm')
     const label = overlay.querySelector('#mg-confirm-label')
+    const progressFill = overlay.querySelector('#mg-progress-fill')
+    const progressWrap = overlay.querySelector('#mg-progress-bar')
     btn.disabled = true
-    label.textContent = 'Erstelle…'
+    progressWrap.classList.add('show')
+    progressFill.style.width = '0%'
+
+    const animated = hasAnimatedItems(_slots)
+    // Render phase = 0–80% of UI, upload+save = 80–100%
+    const onRender = (p) => {
+      progressFill.style.width = `${Math.round(p * 80)}%`
+    }
 
     try {
-      const animated = hasAnimatedItems(_slots)
-      let blob
-      if (animated) {
-        label.textContent = 'Rendere GIF…'
-        blob = await exportAsGif(_slots)
-      } else {
-        blob = await exportAsPng(_slots)
-      }
+      label.textContent = animated ? 'Rendere GIF…' : 'Rendere Bild…'
+      const blob = animated
+        ? await exportAsGif(_slots, { onProgress: onRender })
+        : await exportAsPng(_slots, { onProgress: onRender })
 
-      // Download for the user
       const ext = animated ? 'gif' : 'png'
       const filename = `mood-grid-${Date.now()}.${ext}`
       downloadBlob(blob, filename)
 
-      // Upload to library + insert post
       label.textContent = 'Speichere…'
+      progressFill.style.width = '85%'
       const file = new File([blob], filename, { type: blob.type })
       const { url, type, error } = await uploadPostMedia(file, userId)
       if (error || !url) throw error || new Error('Upload fehlgeschlagen')
 
+      progressFill.style.width = '95%'
       const { error: insertErr } = await insertPost({
         user_id: userId,
         media_url: url,
@@ -352,15 +360,18 @@ function _wireConfirm(overlay, userId, ctx) {
       })
       if (insertErr) throw insertErr
 
+      progressFill.style.width = '100%'
       label.textContent = '✓ Gespeichert'
+      _showToast(animated ? 'Mood Grid GIF erstellt' : 'Mood Grid erstellt')
       setTimeout(() => {
         _closeOverlay(overlay)
-        // Reload current page so the new post shows up if user is on profile/feed.
         if (ctx?.navigate) ctx.navigate(window.location.pathname || '/')
-      }, 800)
+      }, 900)
     } catch (e) {
       console.error('Mood-Grid export failed:', e)
       label.textContent = '✗ Fehler'
+      progressWrap.classList.remove('show')
+      _showToast('Mood Grid Export fehlgeschlagen', { error: true })
       setTimeout(() => {
         label.textContent = 'Bestätigen & speichern'
         btn.disabled = false
@@ -368,6 +379,22 @@ function _wireConfirm(overlay, userId, ctx) {
       }, 1800)
     }
   })
+}
+
+// Subtle bottom toast, matches the app's glass-on-dark style.
+function _showToast(text, opts = {}) {
+  const existing = document.getElementById('_mg-toast')
+  if (existing) existing.remove()
+  const t = document.createElement('div')
+  t.id = '_mg-toast'
+  t.className = 'mg-toast' + (opts.error ? ' mg-toast-error' : '')
+  t.textContent = text
+  document.body.appendChild(t)
+  requestAnimationFrame(() => t.classList.add('show'))
+  setTimeout(() => {
+    t.classList.remove('show')
+    setTimeout(() => t.remove(), 250)
+  }, 2400)
 }
 
 // ─── Close ──────────────────────────────────────────────────────────────────────

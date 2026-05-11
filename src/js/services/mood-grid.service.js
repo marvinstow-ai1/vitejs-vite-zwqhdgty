@@ -1,10 +1,19 @@
 import GIF from 'gif.js'
+// Vite resolves this to a hashed asset URL that exists in the built bundle.
+// Without this, gif.js tries to load `/node_modules/...` which 404s in prod
+// and the encoder hangs forever.
+import gifWorkerUrl from 'gif.js/dist/gif.worker.js?url'
 
-// 3×3 grid, each cell 9:16, total canvas 9:16 (1080×1920).
+// 3×3 grid, each cell 9:16, total canvas 9:16.
 const GRID_COLS = 3
 const GRID_ROWS = 3
+// Full PNG export is mobile-fullscreen (1080×1920). GIF is downscaled because
+// encoding 35 × 1080×1920 frames takes ~minute even on fast laptops; 540×960
+// still looks crisp on phones and encodes ~4× faster.
 const CANVAS_WIDTH = 1080
 const CANVAS_HEIGHT = 1920
+const GIF_WIDTH = 540
+const GIF_HEIGHT = 960
 const CELL_GAP = 6
 const FRAME_DELAY = 200
 const MAX_DURATION_MS = 7000
@@ -71,15 +80,15 @@ function _drawCover(ctx, media, rect) {
  */
 function _drawFrame(items, medias, canvas) {
   const ctx = canvas.getContext('2d')
-  canvas.width = CANVAS_WIDTH
-  canvas.height = CANVAS_HEIGHT
+  const W = canvas.width
+  const H = canvas.height
 
   ctx.fillStyle = '#0a0a0a'
-  ctx.fillRect(0, 0, canvas.width, canvas.height)
+  ctx.fillRect(0, 0, W, H)
 
-  const gap = CELL_GAP
-  const cellW = Math.floor((CANVAS_WIDTH - gap * (GRID_COLS - 1)) / GRID_COLS)
-  const cellH = Math.floor((CANVAS_HEIGHT - gap * (GRID_ROWS - 1)) / GRID_ROWS)
+  const gap = Math.max(2, Math.round(CELL_GAP * (W / CANVAS_WIDTH)))
+  const cellW = Math.floor((W - gap * (GRID_COLS - 1)) / GRID_COLS)
+  const cellH = Math.floor((H - gap * (GRID_ROWS - 1)) / GRID_ROWS)
 
   for (let i = 0; i < GRID_COLS * GRID_ROWS; i++) {
     const rect = _getCellRect(i, cellW, cellH, gap)
@@ -134,32 +143,36 @@ export async function renderGridFrame(items, canvas) {
  * @returns {Promise<Blob>}
  */
 export async function exportAsGif(items, opts = {}) {
-  const { quality = 10, frameDelay = FRAME_DELAY } = opts
+  const { quality = 12, frameDelay = FRAME_DELAY, onProgress } = opts
   const canvas = document.createElement('canvas')
-  canvas.width = CANVAS_WIDTH
-  canvas.height = CANVAS_HEIGHT
+  canvas.width = GIF_WIDTH
+  canvas.height = GIF_HEIGHT
 
   const medias = await _prepareMedias(items)
   medias.forEach(m => { if (m && m.play) m.play().catch(() => {}) })
+  // Capture phase = 0–50% of total progress; gif.js encoding = 50–100%
+  if (onProgress) onProgress(0.05)
 
   const gif = new GIF({
     workers: 2,
     quality,
-    width: CANVAS_WIDTH,
-    height: CANVAS_HEIGHT,
-    workerScript: '/node_modules/gif.js/dist/gif.worker.js',
+    width: GIF_WIDTH,
+    height: GIF_HEIGHT,
+    workerScript: gifWorkerUrl,
   })
 
-  // Hard cap: max 7 seconds of animation — anything longer is wasteful on import
   const totalFrames = Math.min(MAX_FRAMES, Math.floor(MAX_DURATION_MS / frameDelay))
   for (let f = 0; f < totalFrames; f++) {
     _drawFrame(items, medias, canvas)
     gif.addFrame(canvas, { copy: true, delay: frameDelay })
+    if (onProgress) onProgress(0.05 + (f / totalFrames) * 0.45)
+    // Yield so video elements can advance their playback head between frames.
     await new Promise(r => setTimeout(r, frameDelay / 4))
   }
 
   return new Promise((resolve, reject) => {
-    gif.on('finished', resolve)
+    gif.on('progress', p => { if (onProgress) onProgress(0.5 + p * 0.5) })
+    gif.on('finished', blob => { if (onProgress) onProgress(1); resolve(blob) })
     gif.on('error', reject)
     gif.render()
   })
@@ -168,13 +181,20 @@ export async function exportAsGif(items, opts = {}) {
 /**
  * Exportiert das Grid als PNG.
  */
-export async function exportAsPng(items) {
+export async function exportAsPng(items, opts = {}) {
+  const { onProgress } = opts
   const canvas = document.createElement('canvas')
   canvas.width = CANVAS_WIDTH
   canvas.height = CANVAS_HEIGHT
+  if (onProgress) onProgress(0.1)
   const medias = await _prepareMedias(items)
+  if (onProgress) onProgress(0.6)
   _drawFrame(items, medias, canvas)
-  return new Promise(resolve => canvas.toBlob(b => resolve(b), 'image/png'))
+  if (onProgress) onProgress(0.9)
+  return new Promise(resolve => canvas.toBlob(b => {
+    if (onProgress) onProgress(1)
+    resolve(b)
+  }, 'image/png'))
 }
 
 export function downloadBlob(blob, filename) {
