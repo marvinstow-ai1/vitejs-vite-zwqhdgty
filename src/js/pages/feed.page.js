@@ -330,7 +330,42 @@ function _wireFeedActions(profile, navigate) {
       window.scrollTo({ top: 0, behavior: 'smooth' })
     })
   )
+  _wireMobileOverlayToggle()
   wireLightbox('#feed-grid')
+}
+
+// On touch devices: first tap on a cell reveals the action overlay; a second
+// tap (anywhere outside a button) lets the lightbox open. Hides after 3.5s.
+function _wireMobileOverlayToggle() {
+  if (!matchMedia('(hover: none)').matches) return
+  const grid = document.querySelector('#feed-grid')
+  if (!grid || grid.dataset.overlayWired === '1') return
+  grid.dataset.overlayWired = '1'
+
+  let hideTimer = null
+  const hideAll = () => {
+    grid.querySelectorAll('.feed-overlay.show').forEach(o => o.classList.remove('show'))
+  }
+
+  grid.addEventListener('click', e => {
+    if (e.target.closest('button, a, iframe, .feed-username, .feed-mood-tag')) return
+    const cell = e.target.closest('.unified-cell')
+    if (!cell) return
+    const overlay = cell.querySelector('.feed-overlay')
+    if (!overlay) return
+    if (!overlay.classList.contains('show')) {
+      hideAll()
+      overlay.classList.add('show')
+      e.stopPropagation()
+      clearTimeout(hideTimer)
+      hideTimer = setTimeout(() => overlay.classList.remove('show'), 3500)
+    }
+    // else: let the lightbox handler take over
+  }, true)
+
+  document.addEventListener('click', e => {
+    if (!e.target.closest('#feed-grid')) hideAll()
+  })
 }
 
 async function _handleLike(btn, currentUserId) {

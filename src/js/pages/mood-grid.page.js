@@ -138,13 +138,7 @@ function _renderGrid(overlay) {
       cell.innerHTML = `<div class="mg-cell-add">${iconSvg('plus', 20)}</div>`
       return
     }
-    const isVid = item.type === 'video' || item.type === 'gif'
-    cell.innerHTML = isVid
-      ? `<video src="${item.url}" muted loop playsinline autoplay></video>
-         <button class="mg-cell-remove" aria-label="Entfernen">${iconSvg('x', 12)}</button>`
-      : `<img src="${item.url}" alt="" loading="lazy" />
-         <button class="mg-cell-remove" aria-label="Entfernen">${iconSvg('x', 12)}</button>`
-    // Try autoplay (browsers can throttle)
+    cell.innerHTML = `${_mediaTileHtml(item)}<button class="mg-cell-remove" aria-label="Entfernen">${iconSvg('x', 12)}</button>`
     const v = cell.querySelector('video')
     if (v) v.play().catch(() => {})
   })
@@ -268,20 +262,40 @@ function _renderPickerItems(overlay) {
   }
   grid.innerHTML = _library.map(item => {
     const used = usedIds.has(item.postId)
-    const isVid = item.type === 'video' || item.type === 'gif'
     return `
       <div class="unified-cell mg-picker-item ${used ? 'mg-picker-used' : ''}" data-post-id="${item.postId}">
-        ${isVid
-          ? `<video src="${item.url}" muted loop playsinline preload="metadata"></video>`
-          : `<img src="${item.url}" alt="" loading="lazy" />`}
+        ${_mediaTileHtml(item)}
         ${used ? `<span class="mg-picker-used-badge">In Grid</span>` : ''}
         ${item.mood ? `<span class="mg-media-mood">#${escapeHtml(item.mood)}</span>` : ''}
       </div>
     `
   }).join('')
 
-  // Try to autoplay video previews in picker for consistency.
-  grid.querySelectorAll('video').forEach(v => v.play().catch(() => {}))
+  _wireVideoAutoplay(grid)
+}
+
+// GIF files are real images → <img>. Real videos → autoplaying muted <video>.
+function _mediaTileHtml(item) {
+  if (item.type === 'video') {
+    return `<video src="${item.url}" muted loop playsinline autoplay preload="metadata"></video>`
+  }
+  return `<img src="${item.url}" alt="" loading="lazy" />`
+}
+
+let _vidObserver = null
+function _wireVideoAutoplay(container) {
+  if (_vidObserver) { _vidObserver.disconnect(); _vidObserver = null }
+  if (!('IntersectionObserver' in window)) {
+    container.querySelectorAll('video').forEach(v => v.play().catch(() => {}))
+    return
+  }
+  _vidObserver = new IntersectionObserver(entries => {
+    entries.forEach(({ target, isIntersecting }) => {
+      if (isIntersecting) target.play().catch(() => {})
+      else target.pause()
+    })
+  }, { threshold: 0.25, root: container })
+  container.querySelectorAll('video').forEach(v => _vidObserver.observe(v))
 }
 
 function _openPicker(overlay) {
