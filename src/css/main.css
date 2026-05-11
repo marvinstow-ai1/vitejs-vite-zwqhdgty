@@ -957,11 +957,32 @@ input::placeholder, textarea::placeholder { color: rgba(255,255,255,.35); }
   object-fit: cover;
   display: block;
   transition: transform .3s;
+  animation: media-fade-in .45s ease forwards;
 }
 
 .unified-cell:hover img,
 .unified-cell:hover video {
   transform: scale(1.04);
+}
+
+@keyframes media-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* Skeleton cells shown while feed loads */
+.skeleton-cell::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, #161616 25%, #222 50%, #161616 75%);
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes skeleton-shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
 }
 
 /* Grid Controls */
