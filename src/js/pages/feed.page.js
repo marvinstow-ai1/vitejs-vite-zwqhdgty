@@ -214,7 +214,7 @@ function _wireFeedVideos() {
       if (e.isIntersecting) { v.muted = true; v.play().catch(() => {}) }
       else { v.pause(); v.currentTime = 0 }
     })
-  }, { threshold: 0.2, rootMargin: '100px' })
+  }, { threshold: 0.1, rootMargin: '200px' })
   document.querySelectorAll('#feed-grid video').forEach(v => _feedVideoObserver.observe(v))
 }
 

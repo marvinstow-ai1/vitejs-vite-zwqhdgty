@@ -89,8 +89,11 @@ export function getYouTubeEmbedUrl(url) {
 export function renderMediaEl(mediaUrl, mediaType, opts = {}) {
   const { width = '100%', maxHeight = '', cursor = 'pointer', classes = '', dataset = '' } = opts
   const style = `width:${width};display:block;${maxHeight ? `max-height:${maxHeight};object-fit:cover;` : ''}${cursor ? `cursor:${cursor};` : ''}`
-  if (mediaType === 'video' || mediaType === 'gif') {
-    return `<video src="${mediaUrl}" ${classes ? `class="${classes}"` : ''} ${dataset} style="${style}" loop muted playsinline preload="none" onerror="this.style.display='none'"></video>`
+  if (mediaType === 'video') {
+    return `<video src="${mediaUrl}" ${classes ? `class="${classes}"` : ''} ${dataset} style="${style}" loop muted playsinline preload="metadata" onerror="this.style.display='none'"></video>`
+  }
+  if (mediaType === 'gif') {
+    return `<img src="${mediaUrl}" alt="" ${classes ? `class="${classes}"` : ''} ${dataset} style="${style}" loading="lazy" onerror="this.style.display='none'" />`
   }
   if (mediaType === 'youtube') {
     const embedUrl = getYouTubeEmbedUrl(mediaUrl)

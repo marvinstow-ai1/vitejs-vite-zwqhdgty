@@ -28,7 +28,7 @@ function _getExploreObserver() {
       if (e.isIntersecting) { v.muted = true; v.play().catch(() => {}) }
       else { v.pause(); v.currentTime = 0 }
     })
-  }, { threshold: 0.25, rootMargin: '100px' })
+  }, { threshold: 0.1, rootMargin: '200px' })
   return _exploreObserver
 }
 
@@ -289,16 +289,16 @@ function _renderExploreCard(post, currentUserId, usernameMap, interactions) {
   const rc = repostCounts[post.id] || 0
   const username = usernameMap[post.user_id] || 'unknown'
   const mt = post.media_type || detectMediaType(post.media_url)
-  const isVideo = mt === 'video' || mt === 'gif'
+  const isVideo = mt === 'video'
   const isEmbed = mt === 'youtube' || mt === 'instagram'
 
-  // Medien-Element: Videos bekommen autoplay/muted/loop/playsinline + preload=none
   let mediaHtml
   if (isVideo) {
-    mediaHtml = `<video src="${escapeHtml(post.media_url || '')}" muted loop playsinline preload="none" style="width:100%;height:100%;object-fit:cover;display:block;"></video>`
+    mediaHtml = `<video src="${escapeHtml(post.media_url || '')}" muted loop playsinline preload="metadata" style="width:100%;height:100%;object-fit:cover;display:block;"></video>`
   } else if (isEmbed) {
     mediaHtml = renderMediaEl(post.media_url, mt, { borderRadius: '0' })
   } else {
+    // images and gifs both render as <img> (gif animates natively)
     mediaHtml = `<img src="${escapeHtml(post.media_url || '')}" alt="" loading="lazy" style="width:100%;height:100%;object-fit:cover;display:block;" onerror="this.style.display='none'">`
   }
 
