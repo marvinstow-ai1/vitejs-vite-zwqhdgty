@@ -108,9 +108,11 @@ export async function showProfilePage(username, ctx) {
   }
   const hasUnseenStories = hasStories && profileStories.some(s => !profileViewedSet.has(s.id))
 
-  const shuffled = profile.pinned_board_mood
-    ? boardPosts.filter(p => p.mood === profile.pinned_board_mood)
-    : shuffleArray(boardPosts)
+  const shuffled = shuffleArray(
+    profile.pinned_board_mood
+      ? boardPosts.filter(p => p.mood === profile.pinned_board_mood)
+      : boardPosts
+  )
 
   // Tone für globalen Header bestimmen
   const tone = profileHeaderTone(profile)
@@ -482,6 +484,22 @@ export async function showProfilePage(username, ctx) {
     // Unified Grid initialisieren (für "Alle Posts"-Tab)
     initGridCols('#profile-grid')
     renderGridControls(document.querySelector('#profile-grid-controls'), '#profile-grid')
+
+    // Shuffle Button
+    const _shuffleBtn = document.createElement('button')
+    _shuffleBtn.className = 'grid-controls-btn'
+    _shuffleBtn.title = 'Shuffle'
+    _shuffleBtn.setAttribute('aria-label', 'Shuffle')
+    _shuffleBtn.innerHTML = `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/></svg>`
+    document.querySelector('#profile-grid-controls .grid-controls').appendChild(_shuffleBtn)
+    _shuffleBtn.addEventListener('click', () => {
+      const grid = document.querySelector('#profile-grid')
+      if (!grid) return
+      const reshuffled = shuffleArray(boardPosts)
+      grid.innerHTML = reshuffled.map(post => renderBoardPost(post, isOwner, { viewerId: currentUserId, viewerReposted: viewerRepostedSet.has(post.id) })).join('') || '<p style="color:#333;font-size:14px;padding:40px;grid-column:1/-1;">Noch keine Posts.</p>'
+      wireBoardVideos(document.querySelector('#board-content'))
+      wireBoardRepostButtons(currentUserId, (bds, cb) => openRepostModal(bds, cb))
+    })
 
     document.querySelector('#btn-new-board')?.addEventListener('click', () => _openBoardModal(null, currentUserId, profile.username, navigate))
   }
