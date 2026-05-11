@@ -1,4 +1,5 @@
 import { iconSvg } from './utils.js'
+import { openMoodGridCreator } from './pages/mood-grid.page.js'
 
 // ─── Nav preference ───────────────────────────────────────────────────────────
 
@@ -252,11 +253,11 @@ export function refreshUnreadBadge(count = 0) {
 export function shellHtml(active, profile) {
   const u = profile?.username
   const items = [
-    { key: 'home',    label: 'Feed',    icon: 'home',    href: '/' },
-    { key: 'explore', label: 'Explore', icon: 'compass', href: '/explore' },
-    { key: 'post',    label: 'Posten',  icon: 'plus',    fab: true },
-    { key: 'notif',   label: 'Inbox',   icon: 'bell',    badge: true },
-    { key: 'profile', label: 'Profil',  icon: 'user',    href: u ? `/u/${u}` : '/' },
+    { key: 'home',     label: 'Feed',     icon: 'home',    href: '/' },
+    { key: 'explore',  label: 'Explore',  icon: 'compass', href: '/explore' },
+    { key: 'post',     label: 'Posten',   icon: 'plus',    fab: true },
+    { key: 'moodgrid', label: 'MoodGrid', icon: 'grid',    href: null },
+    { key: 'profile',  label: 'Profil',   icon: 'user',    href: u ? `/u/${u}` : '/' },
   ]
 
   const sidebarItems = items.map(it => {
@@ -319,7 +320,7 @@ export function wireShellNav(profile, { navigate, openComposer, toggleNotif }) {
       else if (key === 'profile') { if (u) navigate('/u/' + u) }
       else if (key === 'settings') navigate('/settings')
       else if (key === 'post') openComposer(profile)
-      else if (key === 'notif') toggleNotif(profile)
+      else if (key === 'moodgrid') _openMoodGrid(profile, { navigate })
     }
     el.addEventListener('click', fn)
     _navListeners.push({ el, fn })
@@ -428,4 +429,16 @@ export function updateActiveNav(activeKey) {
   document.querySelectorAll('[data-nav-key]').forEach(el => {
     el.classList.toggle('active', el.dataset.navKey === activeKey)
   })
+}
+
+// ─── Mood Grid (ersetzt Notifications in der Nav) ──────────────────────────────
+
+/**
+ * Wird vom Nav-Button aufgerufen. Öffnet den Mood-Grid Creator.
+ * @param {object|null} profile
+ * @param {{ navigate: function }} ctx
+ */
+function _openMoodGrid(profile, ctx) {
+  if (!profile) return
+  openMoodGridCreator(profile, ctx)
 }
