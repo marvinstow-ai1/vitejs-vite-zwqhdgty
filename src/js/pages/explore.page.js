@@ -8,6 +8,7 @@ import { notifyAction } from '../services/notify.action.js'
 import { getBoardsByUser } from '../services/boards.service.js'
 import { getUnreadCount } from '../services/notifications.service.js'
 import { openCommentsModal, openRepostModal } from './feed.page.js'
+import { wireLightbox } from '../lightbox.js'
 
 // ─── Explore-scoped state ─────────────────────────────────────────────────────
 let exploreMood = null
@@ -380,13 +381,7 @@ function _wireExploreActions(profile, nav) {
     })
   })
 
-  // Media-Klick → Comments Modal
-  document.querySelectorAll('#explore-grid .explore-media').forEach(wrap => {
-    if (wrap.dataset.mediaType === 'youtube' || wrap.dataset.mediaType === 'instagram') return
-    wrap.addEventListener('click', () => openCommentsModal(
-      wrap.dataset.postId, wrap.dataset.mediaUrl, wrap.dataset.mediaType, profile.id, wrap.dataset.ownerId
-    ))
-  })
+  wireLightbox('#explore-grid')
 
   // Username-Klick → Profil
   document.querySelectorAll('#explore-grid .explore-username').forEach(el => {

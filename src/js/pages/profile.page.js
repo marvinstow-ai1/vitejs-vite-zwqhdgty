@@ -9,6 +9,7 @@ import { uploadHeaderImage } from '../services/media.service.js'
 import { getBoardsByUser, getProfileReposts, getUserRepostIds, createBoard, updateBoard } from '../services/boards.service.js'
 import { loadProfileStories, getViewedStoryIds } from '../services/stories.service.js'
 import { renderBoardPost, wireBoardRepostButtons, wireBoardVideos, loadBoardContent } from './board.page.js'
+import { wireLightbox } from '../lightbox.js'
 import { openStoryViewer, openRepostModal } from './feed.page.js'
 import { initGridCols } from '../grid-utils.js'
 import { renderGridControls } from '../grid-controls.js'
@@ -480,6 +481,7 @@ export async function showProfilePage(username, ctx) {
 
     wireBoardRepostButtons(currentUserId, (bds, cb) => openRepostModal(bds, cb))
     wireBoardVideos(document.querySelector('#board-content'))
+    wireLightbox('#board-content')
 
     // Unified Grid initialisieren (für "Alle Posts"-Tab)
     initGridCols('#profile-grid')

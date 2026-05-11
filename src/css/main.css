@@ -965,6 +965,16 @@ input::placeholder, textarea::placeholder { color: rgba(255,255,255,.35); }
   transform: scale(1.04);
 }
 
+/* On touch devices: feed overlay always visible so action buttons are reachable */
+@media (hover: none) {
+  .feed-overlay {
+    opacity: 1;
+    pointer-events: all;
+    background: linear-gradient(to top, rgba(0,0,0,.6) 0%, transparent 55%);
+  }
+  .feed-overlay-top { display: none; }
+}
+
 /* Hide native browser play-button overlays on paused videos */
 video::-webkit-media-controls,
 video::-webkit-media-controls-overlay-play-button,

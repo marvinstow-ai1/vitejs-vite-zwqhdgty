@@ -8,6 +8,7 @@ import { toggleLike, addRepost, removeRepost, getOrCreateRepostsBoardId, loadCom
 import { getBoardsByUser } from '../services/boards.service.js'
 import { notifyAction } from '../services/notify.action.js'
 import { uploadPostMedia } from '../services/media.service.js'
+import { wireLightbox } from '../lightbox.js'
 import { loadNotifications, getUnreadCount, markAllRead, subscribeToNotifications } from '../services/notifications.service.js'
 import { loadStoriesForUser, markStoryViewed, getStoryViewers, deleteStory, uploadStoryFile, insertStory } from '../services/stories.service.js'
 import { searchProfiles } from '../services/profiles.service.js'
@@ -316,13 +317,6 @@ function _wireFeedActions(profile, navigate) {
       openCommentsModal(btn.dataset.postId, btn.dataset.mediaUrl, btn.dataset.mediaType, profile.id, btn.dataset.ownerId)
     })
   )
-  // Media-Klick → Comments Modal
-  document.querySelectorAll('#feed-grid .post-media-wrap').forEach(wrap => {
-    if (wrap.dataset.mediaType === 'youtube' || wrap.dataset.mediaType === 'instagram') return
-    wrap.addEventListener('click', () => openCommentsModal(
-      wrap.dataset.postId, wrap.dataset.mediaUrl, wrap.dataset.mediaType, profile.id, wrap.dataset.ownerId
-    ))
-  })
   // Username-Klick → Profil
   document.querySelectorAll('#feed-grid .feed-username').forEach(el =>
     el.addEventListener('click', e => { e.stopPropagation(); navigate('/u/' + el.dataset.username) })
@@ -336,19 +330,7 @@ function _wireFeedActions(profile, navigate) {
       window.scrollTo({ top: 0, behavior: 'smooth' })
     })
   )
-  // Mobile: Tap auf unified-cell toggelt Overlay (wie Instagram)
-  document.querySelectorAll('#feed-grid .unified-cell').forEach(cell => {
-    cell.addEventListener('click', e => {
-      // Nur toggeln wenn direkt auf die Zelle geklickt wurde (nicht auf Buttons/Links)
-      if (e.target.closest('.feed-overlay-actions') || e.target.closest('.feed-username') || e.target.closest('.feed-mood-tag')) return
-      const overlay = cell.querySelector('.feed-overlay')
-      if (!overlay) return
-      // Prüfen ob hover-fähig (Desktop) – dann nicht toggeln
-      const isHoverable = window.matchMedia('(hover: hover)').matches
-      if (isHoverable) return
-      overlay.classList.toggle('show')
-    })
-  })
+  wireLightbox('#feed-grid')
 }
 
 async function _handleLike(btn, currentUserId) {
