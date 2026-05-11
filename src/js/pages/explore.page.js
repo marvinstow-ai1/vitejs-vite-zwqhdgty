@@ -28,7 +28,7 @@ function _getExploreObserver() {
       if (e.isIntersecting) { v.muted = true; v.play().catch(() => {}) }
       else { v.pause(); v.currentTime = 0 }
     })
-  }, { threshold: 0.25, rootMargin: '100px' })
+  }, { threshold: 0.1, rootMargin: '200px' })
   return _exploreObserver
 }
 
@@ -295,7 +295,7 @@ function _renderExploreCard(post, currentUserId, usernameMap, interactions) {
   // Medien-Element: Videos bekommen autoplay/muted/loop/playsinline + preload=none
   let mediaHtml
   if (isVideo) {
-    mediaHtml = `<video src="${escapeHtml(post.media_url || '')}" muted loop playsinline preload="none" style="width:100%;height:100%;object-fit:cover;display:block;"></video>`
+    mediaHtml = `<video src="${escapeHtml(post.media_url || '')}" muted loop playsinline preload="metadata" style="width:100%;height:100%;object-fit:cover;display:block;"></video>`
   } else if (isEmbed) {
     mediaHtml = renderMediaEl(post.media_url, mt, { borderRadius: '0' })
   } else {

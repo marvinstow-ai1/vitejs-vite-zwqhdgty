@@ -10,16 +10,14 @@ import { renderGridControls } from '../grid-controls.js'
 
 // ── IntersectionObserver für Video-Autoplay ───────────────────────────────────
 let _boardObserver = null
-function _getBoardObserver() {
-  if (_boardObserver) return _boardObserver
-  _boardObserver = new IntersectionObserver(entries => {
+function _makeBoardObserver() {
+  return new IntersectionObserver(entries => {
     entries.forEach(e => {
       const v = e.target
       if (e.isIntersecting) { v.muted = true; v.play().catch(() => {}) }
       else { v.pause(); v.currentTime = 0 }
     })
-  }, { threshold: 0.25, rootMargin: '100px' })
-  return _boardObserver
+  }, { threshold: 0.1, rootMargin: '200px' })
 }
 
 /**
@@ -37,7 +35,7 @@ export function renderBoardPost(post, isOwner, opts = {}) {
     ? `<button class="board-repost-btn" data-post-id="${post.id}" data-owner-id="${post.user_id}" data-reposted="${viewerReposted}" aria-label="Reposten" style="position:absolute;top:4px;right:4px;z-index:4;background:rgba(0,0,0,0.65);border:none;border-radius:50%;width:26px;height:26px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:${viewerReposted ? '#06d6a0' : '#fff'};font-size:13px;line-height:1;">🔁</button>`
     : ''
   if (mt === 'video' || mt === 'gif') {
-    return `<div class="unified-cell" data-post-id="${post.id}"><video src="${post.media_url}" muted loop playsinline preload="none" style="width:100%;height:100%;object-fit:cover;display:block;"></video>${badge}${repostBtn}<button class="board-mute-btn" data-muted="1" title="Ton umschalten">🔇</button></div>`
+    return `<div class="unified-cell" data-post-id="${post.id}"><video src="${post.media_url}" muted loop playsinline preload="metadata" style="width:100%;height:100%;object-fit:cover;display:block;"></video>${badge}${repostBtn}<button class="board-mute-btn" data-muted="1" title="Ton umschalten">🔇</button></div>`
   }
   if (mt === 'youtube') {
     const embedUrl = getYouTubeEmbedUrl(post.media_url)
@@ -51,9 +49,10 @@ export function renderBoardPost(post, isOwner, opts = {}) {
  * und verdrahtet Mute-Buttons.
  */
 export function wireBoardVideos(container) {
-  const obs = _getBoardObserver()
+  if (_boardObserver) _boardObserver.disconnect()
+  _boardObserver = _makeBoardObserver()
   container.querySelectorAll('.unified-cell video').forEach(v => {
-    obs.observe(v)
+    _boardObserver.observe(v)
   })
   container.querySelectorAll('.board-mute-btn').forEach(btn => {
     if (btn.dataset.wired === '1') return
