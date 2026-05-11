@@ -6,8 +6,9 @@ const GRID_ROWS = 3
 const CANVAS_WIDTH = 1080
 const CANVAS_HEIGHT = 1920
 const CELL_GAP = 6
-const VIDEO_FRAME_INTERVAL = 200
-const MAX_FRAMES = 30
+const FRAME_DELAY = 200
+const MAX_DURATION_MS = 7000
+const MAX_FRAMES = Math.floor(MAX_DURATION_MS / FRAME_DELAY) // 35 frames @ 200ms = 7s
 
 function _loadMedia(url, type) {
   return new Promise((resolve, reject) => {
@@ -133,7 +134,7 @@ export async function renderGridFrame(items, canvas) {
  * @returns {Promise<Blob>}
  */
 export async function exportAsGif(items, opts = {}) {
-  const { quality = 10, frameDelay = 200 } = opts
+  const { quality = 10, frameDelay = FRAME_DELAY } = opts
   const canvas = document.createElement('canvas')
   canvas.width = CANVAS_WIDTH
   canvas.height = CANVAS_HEIGHT
@@ -149,7 +150,8 @@ export async function exportAsGif(items, opts = {}) {
     workerScript: '/node_modules/gif.js/dist/gif.worker.js',
   })
 
-  const totalFrames = Math.min(MAX_FRAMES, Math.ceil(3000 / frameDelay))
+  // Hard cap: max 7 seconds of animation — anything longer is wasteful on import
+  const totalFrames = Math.min(MAX_FRAMES, Math.floor(MAX_DURATION_MS / frameDelay))
   for (let f = 0; f < totalFrames; f++) {
     _drawFrame(items, medias, canvas)
     gif.addFrame(canvas, { copy: true, delay: frameDelay })
