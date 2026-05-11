@@ -650,13 +650,13 @@ function _composerModalHtml() {
           <button class="post-tab" data-tab="embed" style="padding:6px 14px;border-radius:20px;border:1px solid #333;background:transparent;color:#aaa;font-size:12px;cursor:pointer;">${iconSvg('play', 14)} Embed</button>
         </div>
         <div id="tab-upload" style="margin-bottom:12px;">
-          <input id="post-file" type="file" accept="image/*,video/*,.gif" style="display:none;" />
+          <input id="post-file" type="file" accept="image/*,video/*,.gif" multiple style="display:none;" />
           <div id="upload-drop" style="border:2px dashed #2a2a2a;border-radius:10px;padding:28px 16px;text-align:center;cursor:pointer;">
             <div style="font-size:28px;margin-bottom:8px;">📷</div>
-            <p style="color:#aaa;font-size:13px;margin:0;">Foto, GIF oder Video auswählen</p>
-            <p style="color:#666;font-size:11px;margin-top:4px;">oder hierher ziehen</p>
+            <p style="color:#aaa;font-size:13px;margin:0;">Fotos, GIFs oder Videos auswählen</p>
+            <p style="color:#666;font-size:11px;margin-top:4px;">Mehrere Dateien möglich · oder hierher ziehen</p>
           </div>
-          <div id="upload-preview" style="display:none;margin-top:10px;border-radius:10px;overflow:hidden;position:relative;"></div>
+          <div id="upload-grid" style="display:none;margin-top:10px;display:none;gap:8px;flex-wrap:wrap;"></div>
           <div id="upload-progress" style="display:none;margin-top:10px;">
             <div style="background:#1a1a1a;border-radius:4px;height:4px;overflow:hidden;"><div id="upload-bar" style="height:100%;background:#fff;width:0%;transition:width 0.3s;"></div></div>
             <p id="upload-status" style="color:#aaa;font-size:11px;margin-top:6px;"></p>
@@ -693,18 +693,13 @@ function _wireComposer(profile, navigate) {
     btn.addEventListener('click', () => {
       postVisibility = btn.dataset.vis
       document.querySelectorAll('#composer-modal .vis-btn').forEach(b => {
-        b.style.background = 'transparent'
-        b.style.color = '#aaa'
-        b.style.border = '1px solid #333'
+        b.style.background = 'transparent'; b.style.color = '#aaa'; b.style.border = '1px solid #333'
       })
-      btn.style.background = '#fff'
-      btn.style.color = '#000'
-      btn.style.border = 'none'
+      btn.style.background = '#fff'; btn.style.color = '#000'; btn.style.border = 'none'
     })
   })
 
-  // Post tabs
-  let activeTab = 'upload', uploadedUrl = null, uploadedType = null
+  let activeTab = 'upload'
   const tabs = ['upload', 'url', 'embed']
   document.querySelectorAll('#composer-modal .post-tab').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -719,43 +714,120 @@ function _wireComposer(profile, navigate) {
     })
   })
 
+  // Bulk upload state: array of { previewUrl, url, type, status: 'uploading'|'ready'|'error', errMsg }
+  let uploadItems = []
+
   const dropZone = document.querySelector('#composer-modal #upload-drop')
   const fileInput = document.querySelector('#composer-modal #post-file')
+  const grid = document.querySelector('#composer-modal #upload-grid')
+
   dropZone.addEventListener('click', () => fileInput.click())
   dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.style.borderColor = '#777' })
   dropZone.addEventListener('dragleave', () => { dropZone.style.borderColor = '#2a2a2a' })
   dropZone.addEventListener('drop', e => {
-    e.preventDefault()
-    dropZone.style.borderColor = '#2a2a2a'
-    if (e.dataTransfer.files[0]) _handleFileSelect(e.dataTransfer.files[0], profile.id)
+    e.preventDefault(); dropZone.style.borderColor = '#2a2a2a'
+    if (e.dataTransfer.files.length) _handleFilesAdded(Array.from(e.dataTransfer.files))
   })
   fileInput.addEventListener('change', e => {
-    if (e.target.files[0]) _handleFileSelect(e.target.files[0], profile.id)
+    if (e.target.files.length) _handleFilesAdded(Array.from(e.target.files))
+    fileInput.value = ''
   })
+
+  function _renderGrid() {
+    if (!uploadItems.length) {
+      grid.style.display = 'none'
+      dropZone.style.display = 'block'
+      return
+    }
+    dropZone.style.display = uploadItems.length < 10 ? 'block' : 'none'
+    dropZone.style.padding = uploadItems.length ? '14px 16px' : '28px 16px'
+    grid.style.display = 'flex'
+    grid.innerHTML = uploadItems.map((item, i) => `
+      <div data-idx="${i}" style="position:relative;width:80px;height:80px;border-radius:8px;overflow:hidden;flex-shrink:0;background:#111;border:1px solid #222;">
+        ${item.type === 'video'
+          ? `<video src="${item.previewUrl}" style="width:100%;height:100%;object-fit:cover;" muted playsinline></video>`
+          : `<img src="${item.previewUrl}" style="width:100%;height:100%;object-fit:cover;" />`}
+        ${item.status === 'uploading' ? `<div style="position:absolute;inset:0;background:rgba(0,0,0,0.55);display:flex;align-items:center;justify-content:center;"><div style="width:20px;height:20px;border:2px solid #fff;border-top-color:transparent;border-radius:50%;animation:spin 0.7s linear infinite;"></div></div>` : ''}
+        ${item.status === 'error' ? `<div style="position:absolute;inset:0;background:rgba(200,0,0,0.45);display:flex;align-items:center;justify-content:center;font-size:18px;">⚠️</div>` : ''}
+        <button class="bulk-remove" data-idx="${i}" style="position:absolute;top:3px;right:3px;background:rgba(0,0,0,0.7);color:#fff;border:none;border-radius:50%;width:20px;height:20px;font-size:13px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;">×</button>
+      </div>`).join('')
+    grid.querySelectorAll('.bulk-remove').forEach(btn => {
+      btn.addEventListener('click', e => {
+        e.stopPropagation()
+        const idx = +btn.dataset.idx
+        URL.revokeObjectURL(uploadItems[idx]?.previewUrl)
+        uploadItems.splice(idx, 1)
+        _renderGrid()
+      })
+    })
+  }
+
+  async function _handleFilesAdded(files) {
+    const newItems = files.map(f => ({
+      file: f,
+      previewUrl: URL.createObjectURL(f),
+      type: f.type.startsWith('video/') ? 'video' : (f.type === 'image/gif' ? 'gif' : 'image'),
+      url: null,
+      status: 'uploading',
+      errMsg: null,
+    }))
+    uploadItems.push(...newItems)
+    _renderGrid()
+
+    await Promise.all(newItems.map(async item => {
+      const { url, type, error } = await uploadPostMedia(item.file, profile.id)
+      if (error) {
+        item.status = 'error'; item.errMsg = error.message
+      } else {
+        item.url = url; item.type = type; item.status = 'ready'
+      }
+      _renderGrid()
+    }))
+  }
 
   document.querySelector('#composer-modal #btn-post').addEventListener('click', async () => {
     const moodRaw = document.querySelector('#composer-modal #post-mood').value.trim()
     const mood = moodRaw.replace(/^#+/, '').toLowerCase().replace(/\s+/g, '_') || null
     const msg = document.querySelector('#composer-modal #post-msg')
-    let mediaUrl = null, mediaType = 'image'
+
     if (activeTab === 'upload') {
-      if (!uploadedUrl) { msg.textContent = 'Bitte erst Datei hochladen'; return }
-      mediaUrl = uploadedUrl; mediaType = uploadedType || 'image'
-    } else if (activeTab === 'url') {
-      mediaUrl = document.querySelector('#composer-modal #post-url').value.trim()
-      if (!mediaUrl) { msg.textContent = 'URL fehlt'; return }
-      mediaType = detectMediaType(mediaUrl)
-    } else if (activeTab === 'embed') {
-      mediaUrl = document.querySelector('#composer-modal #post-embed').value.trim()
-      if (!mediaUrl) { msg.textContent = 'Embed-URL fehlt'; return }
-      mediaType = detectMediaType(mediaUrl)
+      const ready = uploadItems.filter(i => i.status === 'ready')
+      const uploading = uploadItems.filter(i => i.status === 'uploading')
+      if (!uploadItems.length) { msg.textContent = 'Bitte erst Datei(en) hochladen'; return }
+      if (uploading.length) { msg.textContent = 'Noch am Hochladen, bitte warten...'; return }
+      if (!ready.length) { msg.textContent = 'Keine Dateien erfolgreich hochgeladen'; return }
+
+      const btn = document.querySelector('#composer-modal #btn-post')
+      btn.disabled = true
+      let posted = 0
+      for (const item of ready) {
+        msg.textContent = `Posten... (${posted + 1}/${ready.length})`
+        const { error } = await insertPost({
+          user_id: profile.id, media_url: item.url, media_type: item.type, mood, visibility: postVisibility,
+        })
+        if (error) { msg.textContent = `Fehler: ${error.message}`; btn.disabled = false; return }
+        posted++
+      }
+      msg.textContent = `✓ ${posted} Post${posted !== 1 ? 's' : ''} veröffentlicht!`
+    } else {
+      let mediaUrl = null, mediaType = 'image'
+      if (activeTab === 'url') {
+        mediaUrl = document.querySelector('#composer-modal #post-url').value.trim()
+        if (!mediaUrl) { msg.textContent = 'URL fehlt'; return }
+        mediaType = detectMediaType(mediaUrl)
+      } else if (activeTab === 'embed') {
+        mediaUrl = document.querySelector('#composer-modal #post-embed').value.trim()
+        if (!mediaUrl) { msg.textContent = 'Embed-URL fehlt'; return }
+        mediaType = detectMediaType(mediaUrl)
+      }
+      msg.textContent = 'Posten...'
+      const { error } = await insertPost({
+        user_id: profile.id, media_url: mediaUrl, media_type: mediaType, mood, visibility: postVisibility,
+      })
+      if (error) { msg.textContent = error.message; return }
+      msg.textContent = '✓ Gepostet!'
     }
-    msg.textContent = 'Posten...'
-    const { error } = await insertPost({
-      user_id: profile.id, media_url: mediaUrl, media_type: mediaType, mood, visibility: postVisibility,
-    })
-    if (error) { msg.textContent = error.message; return }
-    msg.textContent = '✓ Gepostet!'
+
     setTimeout(() => {
       _closeComposerModal()
       if (location.pathname.startsWith('/u/' + profile.username)) {
@@ -765,38 +837,6 @@ function _wireComposer(profile, navigate) {
       }
     }, 600)
   })
-
-  async function _handleFileSelect(file, userId) {
-    const msgEl = document.querySelector('#composer-modal #post-msg')
-    const isVideo = file.type.startsWith('video/')
-    const previewWrap = document.querySelector('#composer-modal #upload-preview')
-    previewWrap.style.display = 'block'
-    dropZone.style.display = 'none'
-    previewWrap.innerHTML = `
-      <button id="upload-clear" style="position:absolute;top:8px;right:8px;z-index:2;background:rgba(0,0,0,0.7);color:#fff;border:none;border-radius:50%;width:28px;height:28px;cursor:pointer;font-size:16px;line-height:1;">×</button>
-      ${isVideo
-        ? `<video src="${URL.createObjectURL(file)}" style="width:100%;max-height:280px;object-fit:cover;display:block;" autoplay loop muted playsinline></video>`
-        : `<img src="${URL.createObjectURL(file)}" style="width:100%;max-height:280px;object-fit:cover;display:block;" />`}`
-    previewWrap.querySelector('#upload-clear').addEventListener('click', () => {
-      uploadedUrl = null; uploadedType = null
-      previewWrap.style.display = 'none'; dropZone.style.display = 'block'; fileInput.value = ''
-    })
-    const progress = document.querySelector('#composer-modal #upload-progress')
-    const bar = document.querySelector('#composer-modal #upload-bar')
-    const status = document.querySelector('#composer-modal #upload-status')
-    progress.style.display = 'block'; bar.style.width = '30%'; status.textContent = 'Hochladen...'
-    const { url, type, error } = await uploadPostMedia(file, userId)
-    if (error) {
-      status.textContent = '❌ ' + error.message
-      if (msgEl && error.message === 'Max 50MB') msgEl.textContent = 'Max 50MB'
-      return
-    }
-    bar.style.width = '100%'
-    uploadedUrl = url
-    uploadedType = type
-    status.textContent = '✅ Bereit'
-    setTimeout(() => { progress.style.display = 'none' }, 1500)
-  }
 }
 
 // ─── Repost Modal ─────────────────────────────────────────────────────────────
