@@ -3,6 +3,7 @@ import { getSession } from '../services/auth.service.js'
 import { getBoardPosts, getBoardsByUser, addPostToBoard, deleteBoard, getUserRepostIds } from '../services/boards.service.js'
 import { getVisiblePostIds } from '../services/posts.service.js'
 import { escapeHtml, detectMediaType, getYouTubeEmbedUrl, buildMusicEmbed } from '../utils.js'
+import { wireLightbox } from '../lightbox.js'
 import { addRepost, removeRepost } from '../services/interactions.service.js'
 import { renderGlobalHeader } from '../shell.js'
 import { initGridCols } from '../grid-utils.js'
@@ -162,6 +163,7 @@ export async function loadBoardContent(boardId, container, isOwner, currentUserI
 
   wireBoardRepostButtons(currentUserId, openRepostModal)
   wireBoardVideos(container)
+  wireLightbox(container)
 
   // Unified Grid initialisieren
   const boardGrid = container.querySelector('#board-grid')
