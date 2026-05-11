@@ -90,17 +90,18 @@ export function renderMediaEl(mediaUrl, mediaType, opts = {}) {
   const { width = '100%', maxHeight = '', cursor = 'pointer', classes = '', dataset = '' } = opts
   const style = `width:${width};display:block;${maxHeight ? `max-height:${maxHeight};object-fit:cover;` : ''}${cursor ? `cursor:${cursor};` : ''}`
   if (mediaType === 'video' || mediaType === 'gif') {
-    return `<video src="${mediaUrl}" ${classes ? `class="${classes}"` : ''} ${dataset} style="${style}" autoplay loop muted playsinline onerror="this.style.display='none'"></video>`
+    // preload="none" defers network fetch until the IntersectionObserver calls .play()
+    return `<video src="${mediaUrl}" ${classes ? `class="${classes}"` : ''} ${dataset} style="${style}" autoplay loop muted playsinline preload="none" onerror="this.style.display='none'"></video>`
   }
   if (mediaType === 'youtube') {
     const embedUrl = getYouTubeEmbedUrl(mediaUrl)
     if (!embedUrl) return ''
-    return `<div style="position:relative;width:100%;padding-bottom:56.25%;background:#000;"><iframe src="${embedUrl}" style="position:absolute;inset:0;width:100%;height:100%;border:none;" allow="accelerometer;autoplay;clipboard-write;encrypted-media;gyroscope;picture-in-picture" allowfullscreen></iframe></div>`
+    return `<div style="position:relative;width:100%;padding-bottom:56.25%;background:#000;"><iframe src="${embedUrl}" loading="lazy" style="position:absolute;inset:0;width:100%;height:100%;border:none;" allow="accelerometer;autoplay;clipboard-write;encrypted-media;gyroscope;picture-in-picture" allowfullscreen></iframe></div>`
   }
   if (mediaType === 'instagram') {
     return `<div style="padding:12px;background:#111;border-radius:8px;text-align:center;"><a href="${mediaUrl}" target="_blank" rel="noopener" style="color:#4d9fff;font-size:13px;text-decoration:none;">📷 Instagram öffnen →</a></div>`
   }
-  return `<img src="${mediaUrl}" alt="" ${classes ? `class="${classes}"` : ''} ${dataset} style="${style}" onerror="this.style.display='none'" />`
+  return `<img src="${mediaUrl}" alt="" ${classes ? `class="${classes}"` : ''} ${dataset} loading="lazy" decoding="async" style="${style}" onerror="this.style.display='none'" />`
 }
 
 // ─── Profile header helpers ───────────────────────────────────────────────────

@@ -16,6 +16,7 @@ import { searchProfiles } from '../services/profiles.service.js'
 let activeMood = null
 let searchTimeout = null
 let _notifChannel = null
+let _feedVideoObserver = null
 
 // ─── Feed Page ────────────────────────────────────────────────────────────────
 
@@ -168,7 +169,8 @@ export async function loadFeed(profile, navigate) {
   _renderFilterBar(profile, navigate)
 
   state.classList.add('hidden')
-  grid.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:20px;"><div class="spinner-wrap"><div class="spinner"></div></div></div>`
+  // Show skeleton grid immediately so users see layout at once
+  grid.innerHTML = Array(16).fill('<div class="unified-cell skeleton-cell"></div>').join('')
 
   const { data: allPosts, error } = await loadFeedPosts(profile.id, activeMood)
   if (error) {
@@ -201,6 +203,19 @@ export async function loadFeed(profile, navigate) {
     .join('')
 
   _wireFeedActions(profile, navigate)
+  _wireFeedVideos()
+}
+
+function _wireFeedVideos() {
+  if (_feedVideoObserver) _feedVideoObserver.disconnect()
+  _feedVideoObserver = new IntersectionObserver(entries => {
+    entries.forEach(e => {
+      const v = e.target
+      if (e.isIntersecting) { v.muted = true; v.play().catch(() => {}) }
+      else { v.pause(); v.currentTime = 0 }
+    })
+  }, { threshold: 0.2, rootMargin: '100px' })
+  document.querySelectorAll('#feed-grid video').forEach(v => _feedVideoObserver.observe(v))
 }
 
 function _showState(html) {
