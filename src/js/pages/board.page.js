@@ -34,7 +34,10 @@ export function renderBoardPost(post, isOwner, opts = {}) {
   const repostBtn = canRepost
     ? `<button class="board-repost-btn" data-post-id="${post.id}" data-owner-id="${post.user_id}" data-reposted="${viewerReposted}" aria-label="Reposten" style="position:absolute;top:4px;right:4px;z-index:4;background:rgba(0,0,0,0.65);border:none;border-radius:50%;width:26px;height:26px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:${viewerReposted ? '#06d6a0' : '#fff'};font-size:13px;line-height:1;">🔁</button>`
     : ''
-  if (mt === 'video' || mt === 'gif') {
+  if (mt === 'gif') {
+    return `<div class="unified-cell" data-post-id="${post.id}"><img src="${post.media_url}" alt="" loading="lazy" onerror="this.style.display='none'" style="width:100%;height:100%;object-fit:cover;display:block;" />${badge}${repostBtn}</div>`
+  }
+  if (mt === 'video') {
     return `<div class="unified-cell" data-post-id="${post.id}"><video src="${post.media_url}" muted loop playsinline preload="metadata" style="width:100%;height:100%;object-fit:cover;display:block;"></video>${badge}${repostBtn}<button class="board-mute-btn" data-muted="1" title="Ton umschalten">🔇</button></div>`
   }
   if (mt === 'youtube') {
