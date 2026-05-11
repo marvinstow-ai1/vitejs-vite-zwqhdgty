@@ -83,3 +83,95 @@ export async function uploadStoryMedia(file, userId) {
   const { data } = supabase.storage.from('stories').getPublicUrl(path)
   return { url: data.publicUrl, type: kind, error: null }
 }
+
+// ─── Delete helpers ──────────────────────────────────────────────────────────────
+
+/**
+ * Extrahiert Bucket und Pfad aus einer Supabase Public-URL.
+ * @param {string} url
+ * @returns {{ bucket: string|null, path: string|null }}
+ */
+function _parseStorageUrl(url) {
+  if (!url) return { bucket: null, path: null }
+  // Format: https://<project>.supabase.co/storage/v1/object/public/<bucket>/<path>
+  const match = url.match(/\/object\/public\/([^/]+)\/(.+)/)
+  if (!match) return { bucket: null, path: null }
+  return { bucket: match[1], path: match[2] }
+}
+
+/**
+ * Löscht eine Datei aus dem Supabase Storage anhand ihrer Public-URL.
+ * @param {string} url
+ * @returns {Promise<{ error: object|null }>}
+ */
+export async function deleteStorageFile(url) {
+  const { bucket, path } = _parseStorageUrl(url)
+  if (!bucket || !path) return { error: { message: 'Ungültige Storage-URL' } }
+  const { error } = await supabase.storage.from(bucket).remove([path])
+  return { error }
+}
+
+/**
+ * Löscht mehrere Dateien aus dem Supabase Storage anhand ihrer Public-URLs.
+ * @param {string[]} urls
+ * @returns {Promise<{ error: object|null }>}
+ */
+export async function deleteStorageFiles(urls) {
+  const pathsByBucket = {}
+  for (const url of urls) {
+    const { bucket, path } = _parseStorageUrl(url)
+    if (bucket && path) {
+      if (!pathsByBucket[bucket]) pathsByBucket[bucket] = []
+      pathsByBucket[bucket].push(path)
+    }
+  }
+  const errors = []
+  for (const [bucket, paths] of Object.entries(pathsByBucket)) {
+    const { error } = await supabase.storage.from(bucket).remove(paths)
+    if (error) errors.push(error)
+  }
+  return { error: errors.length ? errors[0] : null }
+}
+
+/**
+ * Löscht Posts inkl. aller abhängigen Daten (Likes, Comments, Reposts, Board-Posts)
+ * und der zugehörigen Storage-Dateien.
+ *
+ * @param {string[]} postIds
+ * @param {string} userId — zur Sicherheit: nur Posts dieses Users werden gelöscht
+ * @returns {Promise<{ error: object|null }>}
+ */
+export async function deletePostsWithMedia(postIds, userId) {
+  if (!postIds.length) return { error: null }
+
+  // 1. Medien-URLs der Posts abrufen (nur eigene Posts)
+  const { data: posts, error: fetchError } = await supabase
+    .from('posts')
+    .select('id, media_url')
+    .in('id', postIds)
+    .eq('user_id', userId)
+
+  if (fetchError) return { error: fetchError }
+
+  // 2. Storage-Dateien löschen
+  const mediaUrls = posts.map(p => p.media_url).filter(Boolean)
+  if (mediaUrls.length) {
+    const { error: storageError } = await deleteStorageFiles(mediaUrls)
+    if (storageError) console.error('Storage delete error:', storageError)
+  }
+
+  // 3. Abhängige Daten löschen (Reihenfolge wichtig wegen Foreign Keys)
+  await supabase.from('likes').delete().in('post_id', postIds)
+  await supabase.from('comments').delete().in('post_id', postIds)
+  await supabase.from('reposts').delete().in('post_id', postIds)
+  await supabase.from('board_posts').delete().in('post_id', postIds)
+
+  // 4. Posts selbst löschen
+  const { error } = await supabase
+    .from('posts')
+    .delete()
+    .in('id', postIds)
+    .eq('user_id', userId)
+
+  return { error }
+}

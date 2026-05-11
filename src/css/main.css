@@ -1357,3 +1357,80 @@ video::-webkit-media-controls-start-playback-button {
     border-bottom: 0;
   }
 }
+
+/* ─── Photo Selection Mode ──────────────────────────────────── */
+.cell-selectable {
+  cursor: pointer;
+}
+
+.cell-selectable::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,0);
+  transition: background .15s;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.cell-selectable:hover::after {
+  background: rgba(0,0,0,0.3);
+}
+
+.cell-checkbox {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 5;
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255,255,255,0.8);
+  pointer-events: none;
+  filter: drop-shadow(0 1px 3px rgba(0,0,0,0.5));
+  transition: transform .12s, color .15s;
+}
+
+.cell-selected .cell-checkbox {
+  color: #fff;
+  transform: scale(1.1);
+}
+
+.cell-selected {
+  outline: 2.5px solid #fff;
+  outline-offset: -2.5px;
+  z-index: 3;
+}
+
+.cell-selected::after {
+  background: rgba(0,0,0,0.25) !important;
+}
+
+/* Active state for the select button */
+.gh-btn.active-select {
+  background: rgba(255,255,255,0.2);
+  color: #fff;
+}
+
+.global-header--light .gh-btn.active-select {
+  background: rgba(0,0,0,0.15);
+  color: #000;
+}
+
+/* Delete bar animation */
+#photo-delete-bar {
+  animation: slideUpBar .25s ease;
+}
+
+@keyframes slideUpBar {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}

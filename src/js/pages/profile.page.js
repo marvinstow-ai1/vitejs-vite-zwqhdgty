@@ -5,7 +5,7 @@ import { openSettingsModal } from './settings.page.js'
 import { getVisiblePostIds } from '../services/posts.service.js'
 import { followUser, unfollowUser, sendFollowRequest, withdrawFollowRequest, blockUser, unblockUser } from '../services/interactions.service.js'
 import { notifyAction } from '../services/notify.action.js'
-import { uploadHeaderImage } from '../services/media.service.js'
+import { uploadHeaderImage, deletePostsWithMedia } from '../services/media.service.js'
 import { getBoardsByUser, getProfileReposts, getUserRepostIds, createBoard, updateBoard } from '../services/boards.service.js'
 import { loadProfileStories, getViewedStoryIds } from '../services/stories.service.js'
 import { renderBoardPost, wireBoardRepostButtons, wireBoardVideos, loadBoardContent } from './board.page.js'
@@ -313,6 +313,7 @@ export async function showProfilePage(username, ctx) {
   // ── Profile Actions für Top Bar ──────────────────────────────────────────────
   const profileActionsHtml = isOwner
     ? `<button class="gh-btn" id="btn-edit" aria-label="Profil bearbeiten">${iconSvg('edit', 14)}</button>
+       <button class="gh-btn" id="btn-select-photos" aria-label="Fotos auswählen">${iconSvg('image', 14)}</button>
        <button class="gh-btn" id="btn-settings-link" aria-label="Einstellungen">${iconSvg('settings', 14)}</button>`
     : currentUserId
       ? `${!iBlocked ? `<button class="gh-btn" id="btn-follow" data-state="${followState}" style="padding:0 12px;font-size:12px;font-weight:600;">${followState === 'accepted' ? 'Folgst du' : followState === 'pending' ? 'Angefragt' : 'Folgen'}</button>` : ''}
@@ -504,6 +505,107 @@ export async function showProfilePage(username, ctx) {
     })
 
     document.querySelector('#btn-new-board')?.addEventListener('click', () => _openBoardModal(null, currentUserId, profile.username, navigate))
+  }
+
+  // ── Photo Selection / Delete Mode ──────────────────────────────────────────
+  if (isOwner && boardPosts.length) {
+    let selectionMode = false
+    const selectedSet = new Set()
+    const selectBtn = document.querySelector('#btn-select-photos')
+    const boardContent = document.querySelector('#board-content')
+
+    // Floating Delete Bar (wird bei Bedarf eingefügt)
+    const deleteBar = document.createElement('div')
+    deleteBar.id = 'photo-delete-bar'
+    deleteBar.style.cssText = 'display:none;position:fixed;bottom:80px;left:50%;transform:translateX(-50%);z-index:150;background:rgba(15,15,15,0.95);backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,0.12);border-radius:16px;padding:12px 18px;align-items:center;gap:14px;box-shadow:0 8px 32px rgba(0,0,0,0.6);'
+    deleteBar.innerHTML = `
+      <span id="delete-count" style="color:#fff;font-size:13px;font-weight:500;white-space:nowrap;">0 ausgewählt</span>
+      <button id="btn-delete-selected" style="padding:8px 18px;background:#ff4d6d;color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;transition:opacity .15s;">${iconSvg('trash', 14)} Löschen</button>
+      <button id="btn-cancel-selection" style="padding:8px 14px;background:transparent;color:#888;border:1px solid rgba(255,255,255,0.1);border-radius:10px;font-size:12px;cursor:pointer;">Abbrechen</button>
+    `
+    document.body.appendChild(deleteBar)
+
+    const updateDeleteBar = () => {
+      const count = selectedSet.size
+      document.querySelector('#delete-count').textContent = count + ' ausgewählt'
+      document.querySelector('#btn-delete-selected').style.opacity = count ? '1' : '0.4'
+    }
+
+    const exitSelectionMode = () => {
+      selectionMode = false
+      selectedSet.clear()
+      selectBtn.classList.remove('active-select')
+      selectBtn.innerHTML = iconSvg('image', 14)
+      deleteBar.style.display = 'none'
+      document.querySelectorAll('.unified-cell').forEach(cell => {
+        cell.classList.remove('cell-selected', 'cell-selectable')
+        const cb = cell.querySelector('.cell-checkbox')
+        if (cb) cb.remove()
+      })
+    }
+
+    selectBtn.addEventListener('click', () => {
+      if (selectionMode) {
+        exitSelectionMode()
+        return
+      }
+      selectionMode = true
+      selectBtn.classList.add('active-select')
+      selectBtn.innerHTML = iconSvg('x', 14)
+      deleteBar.style.display = 'flex'
+
+      document.querySelectorAll('.unified-cell').forEach(cell => {
+        cell.classList.add('cell-selectable')
+        const cb = document.createElement('div')
+        cb.className = 'cell-checkbox'
+        cb.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="4" ry="4"/></svg>`
+        cell.appendChild(cb)
+
+        cell.addEventListener('click', function _onCellClick(e) {
+          if (!selectionMode) return
+          e.stopPropagation()
+          e.preventDefault()
+          const postId = cell.dataset.postId
+          if (!postId) return
+          if (selectedSet.has(postId)) {
+            selectedSet.delete(postId)
+            cell.classList.remove('cell-selected')
+            cb.querySelector('svg').innerHTML = '<rect x="3" y="3" width="18" height="18" rx="4" ry="4"/>'
+          } else {
+            selectedSet.add(postId)
+            cell.classList.add('cell-selected')
+            cb.querySelector('svg').innerHTML = '<rect x="3" y="3" width="18" height="18" rx="4" ry="4" fill="#fff"/><polyline points="7,13 10,16 17,8" stroke="#000" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>'
+          }
+          updateDeleteBar()
+        })
+      })
+      updateDeleteBar()
+    })
+
+    document.querySelector('#btn-cancel-selection').addEventListener('click', exitSelectionMode)
+
+    document.querySelector('#btn-delete-selected').addEventListener('click', async () => {
+      const ids = [...selectedSet]
+      if (!ids.length) return
+      if (!confirm(`${ids.length} ${ids.length === 1 ? 'Post' : 'Posts'} unwiderruflich löschen?`)) return
+      const btn = document.querySelector('#btn-delete-selected')
+      btn.textContent = 'Lösche...'
+      btn.disabled = true
+      const { error } = await deletePostsWithMedia(ids, currentUserId)
+      if (error) {
+        console.error('Delete failed:', error)
+        btn.textContent = '❌ Fehler'
+        setTimeout(() => { btn.textContent = 'Löschen'; btn.disabled = false }, 2000)
+        return
+      }
+      exitSelectionMode()
+      showProfilePage(profile.username, ctx)
+    })
+
+    // Exit selection mode on Escape
+    document.addEventListener('keydown', function _onKey(e) {
+      if (e.key === 'Escape' && selectionMode) exitSelectionMode()
+    })
   }
 
   if (!isOwner) return
