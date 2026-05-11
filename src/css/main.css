@@ -1760,3 +1760,59 @@ video::-webkit-media-controls-start-playback-button {
 @media (max-width: 420px) {
   .mg-canvas { width: 86vw; }
 }
+
+/* Mood Grid: progress bar + toast */
+.mg-progress-bar {
+  height: 3px;
+  width: 100%;
+  margin-top: 10px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.07);
+  overflow: hidden;
+  opacity: 0;
+  transform: translateY(2px);
+  transition: opacity .2s ease, transform .2s ease;
+  pointer-events: none;
+}
+.mg-progress-bar.show { opacity: 1; transform: translateY(0); }
+.mg-progress-fill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, rgba(255,255,255,0.7), #fff);
+  border-radius: 999px;
+  transition: width .2s ease;
+  box-shadow: 0 0 8px rgba(255,255,255,0.25);
+}
+
+.mg-toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(96px + env(safe-area-inset-bottom));
+  transform: translate(-50%, 16px);
+  z-index: 500;
+  padding: 10px 16px;
+  background: rgba(20,20,20,0.92);
+  color: #fff;
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  box-shadow: 0 12px 36px rgba(0,0,0,0.5);
+  backdrop-filter: blur(20px) saturate(1.4);
+  -webkit-backdrop-filter: blur(20px) saturate(1.4);
+  opacity: 0;
+  transition: opacity .22s ease, transform .22s ease;
+  pointer-events: none;
+  max-width: calc(100% - 32px);
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mg-toast.show { opacity: 1; transform: translate(-50%, 0); }
+.mg-toast-error {
+  background: rgba(40,15,18,0.95);
+  border-color: rgba(255,77,109,0.35);
+  color: #ff8a9b;
+}
