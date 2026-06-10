@@ -1,15 +1,933 @@
 <!doctype html>
 <html lang="de">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Marvin's Place</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
-    <script type="module" src="/src/js/main.js"></script>
-  </head>
-  <body data-nav="auto">
-    <div id="app"></div>
-  </body>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Chef's Schokoelsen Bons Feast</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🍫</text></svg>" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #2b1a10;
+      --bg-deep: #1f1209;
+      --panel: #3a2516;
+      --panel-2: #462d1b;
+      --line: #5c3d24;
+      --cream: #f6e7c9;
+      --cream-dim: #d8c19a;
+      --red: #d8432f;
+      --red-hover: #e85a45;
+      --orange: #f08a24;
+      --gold: #f5c142;
+      --green: #7bb661;
+      --shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
+      --radius: 16px;
+      --font-head: "Luckiest Guy", cursive;
+      --font-body: "Nunito", sans-serif;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; }
+
+    body {
+      font-family: var(--font-body);
+      color: var(--cream);
+      background:
+        radial-gradient(1200px 600px at 50% -10%, #4a2e19 0%, transparent 60%),
+        radial-gradient(900px 500px at 90% 110%, #3d2412 0%, transparent 55%),
+        var(--bg);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    h1, h2, h3 { font-family: var(--font-head); font-weight: 400; letter-spacing: 0.04em; }
+
+    button { font-family: inherit; cursor: pointer; }
+    button:disabled { cursor: not-allowed; }
+    img { user-select: none; -webkit-user-drag: none; }
+
+    /* ---------- Top bar ---------- */
+    .topbar {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
+      padding: 12px 20px;
+      background: linear-gradient(180deg, #241509, #2e1c0e);
+      border-bottom: 3px solid var(--line);
+      box-shadow: var(--shadow);
+      position: sticky;
+      top: 0;
+      z-index: 50;
+    }
+
+    .topbar h1 {
+      font-size: clamp(1.2rem, 3vw, 1.9rem);
+      color: var(--gold);
+      text-shadow: 2px 3px 0 rgba(0, 0, 0, 0.5);
+      flex: 1 1 auto;
+    }
+
+    .topstats { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; }
+
+    .topstat {
+      background: var(--panel);
+      border: 2px solid var(--line);
+      border-radius: 12px;
+      padding: 6px 14px;
+      text-align: center;
+      min-width: 130px;
+    }
+    .topstat .label { font-size: 0.65rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--cream-dim); }
+    .topstat .value { font-family: var(--font-head); font-size: 1.15rem; color: var(--cream); }
+
+    .btn-reset {
+      background: var(--red);
+      color: #fff;
+      border: none;
+      border-bottom: 4px solid #9c2c1c;
+      border-radius: 12px;
+      padding: 9px 16px;
+      font-weight: 800;
+      font-size: 0.85rem;
+      transition: background 0.15s, transform 0.05s;
+    }
+    .btn-reset:hover { background: var(--red-hover); }
+    .btn-reset:active { transform: translateY(2px); border-bottom-width: 2px; }
+
+    .btn-sound {
+      background: var(--panel-2);
+      color: var(--cream);
+      border: 2px solid var(--line);
+      border-radius: 12px;
+      padding: 8px 12px;
+      font-size: 0.85rem;
+      font-weight: 800;
+      transition: background 0.15s;
+    }
+    .btn-sound:hover { background: var(--line); }
+    .btn-sound[aria-pressed="true"] { background: var(--orange); border-color: var(--orange); color: #2b1a10; }
+
+    /* ---------- Layout ---------- */
+    .game {
+      flex: 1;
+      display: grid;
+      grid-template-columns: minmax(260px, 330px) minmax(0, 1fr) minmax(300px, 380px);
+      gap: 18px;
+      padding: 18px;
+      max-width: 1500px;
+      width: 100%;
+      margin: 0 auto;
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 2px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 16px;
+    }
+
+    /* ---------- Chef panel ---------- */
+    .chef-panel { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+
+    .bubble {
+      position: relative;
+      background: var(--cream);
+      color: #3a2310;
+      border-radius: 14px;
+      padding: 12px 16px;
+      font-weight: 800;
+      font-size: 0.95rem;
+      text-align: center;
+      width: 100%;
+      min-height: 52px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      transform: translateY(8px) scale(0.92);
+      transition: opacity 0.25s ease, transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+    .bubble::after {
+      content: "";
+      position: absolute;
+      bottom: -10px;
+      left: 50%;
+      transform: translateX(-50%);
+      border: 10px solid transparent;
+      border-top-color: var(--cream);
+      border-bottom: none;
+    }
+    .bubble.show { opacity: 1; transform: translateY(0) scale(1); }
+    .bubble.milestone { background: var(--gold); box-shadow: 0 0 24px rgba(245, 193, 66, 0.55); }
+    .bubble.milestone::after { border-top-color: var(--gold); }
+
+    .chef-figure { position: relative; width: min(220px, 60vw); }
+    .chef-figure img { width: 100%; display: block; filter: drop-shadow(0 10px 14px rgba(0, 0, 0, 0.5)); }
+
+    .chef-figure.munch { animation: munch 0.45s ease; }
+    @keyframes munch {
+      0% { transform: rotate(0) scale(1); }
+      25% { transform: rotate(-4deg) scale(1.05, 0.95); }
+      50% { transform: rotate(3deg) scale(0.97, 1.04); }
+      75% { transform: rotate(-2deg) scale(1.03, 0.98); }
+      100% { transform: rotate(0) scale(1); }
+    }
+    .chef-figure.hyped { animation: hyped 0.9s ease; }
+    @keyframes hyped {
+      0%, 100% { transform: translateY(0) rotate(0); filter: none; }
+      20% { transform: translateY(-14px) rotate(-5deg); }
+      40% { transform: translateY(0) rotate(4deg); }
+      60% { transform: translateY(-9px) rotate(-3deg); filter: drop-shadow(0 0 18px rgba(245, 193, 66, 0.8)); }
+      80% { transform: translateY(0) rotate(2deg); }
+    }
+
+    .chef-caption {
+      font-family: var(--font-head);
+      color: var(--orange);
+      font-size: 1.05rem;
+      text-align: center;
+      text-shadow: 1px 2px 0 rgba(0, 0, 0, 0.5);
+    }
+
+    .stats { width: 100%; display: flex; flex-direction: column; gap: 8px; }
+    .stat-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 10px;
+      background: var(--panel-2);
+      border: 2px solid var(--line);
+      border-radius: 10px;
+      padding: 8px 12px;
+    }
+    .stat-row .label { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--cream-dim); }
+    .stat-row .value { font-family: var(--font-head); font-size: 1.05rem; color: var(--cream); white-space: nowrap; }
+
+    /* ---------- Clicker ---------- */
+    .clicker-panel {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 18px;
+      position: relative;
+      overflow: hidden;
+      min-height: 420px;
+    }
+
+    .big-count {
+      font-family: var(--font-head);
+      font-size: clamp(1.9rem, 4.5vw, 3rem);
+      color: var(--gold);
+      text-shadow: 2px 4px 0 rgba(0, 0, 0, 0.5);
+      text-align: center;
+      line-height: 1;
+    }
+    .big-count small { display: block; font-size: 0.42em; color: var(--cream-dim); margin-top: 6px; letter-spacing: 0.06em; }
+
+    .bons-btn {
+      width: min(320px, 70vw);
+      aspect-ratio: 1;
+      border-radius: 50%;
+      border: 6px solid var(--gold);
+      padding: 0;
+      background: #c9b8a4;
+      overflow: hidden;
+      box-shadow: 0 0 0 10px rgba(245, 193, 66, 0.15), 0 18px 40px rgba(0, 0, 0, 0.55);
+      transition: transform 0.08s ease, box-shadow 0.2s ease;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .bons-btn img { width: 100%; height: 100%; object-fit: cover; display: block; pointer-events: none; }
+    .bons-btn:hover { transform: scale(1.03); box-shadow: 0 0 0 14px rgba(245, 193, 66, 0.22), 0 18px 44px rgba(0, 0, 0, 0.55); }
+    .bons-btn:active { transform: scale(0.96); }
+    .bons-btn.pop { animation: pop 0.18s ease; }
+    @keyframes pop {
+      0% { transform: scale(1); }
+      40% { transform: scale(0.92); }
+      70% { transform: scale(1.06); }
+      100% { transform: scale(1); }
+    }
+
+    .click-hint { color: var(--cream-dim); font-weight: 700; font-size: 0.85rem; }
+
+    .float-num {
+      position: absolute;
+      font-family: var(--font-head);
+      font-size: 1.4rem;
+      color: var(--gold);
+      text-shadow: 1px 2px 0 rgba(0, 0, 0, 0.6);
+      pointer-events: none;
+      animation: floatUp 1s ease-out forwards;
+      z-index: 10;
+    }
+    @keyframes floatUp {
+      0% { opacity: 1; transform: translate(-50%, 0) scale(0.7); }
+      20% { transform: translate(-50%, -18px) scale(1.15); }
+      100% { opacity: 0; transform: translate(-50%, -90px) scale(1); }
+    }
+
+    /* ---------- Shop ---------- */
+    .shop { display: flex; flex-direction: column; gap: 12px; min-height: 0; }
+
+    .tabs { display: flex; gap: 8px; }
+    .tab {
+      flex: 1;
+      background: var(--panel-2);
+      color: var(--cream-dim);
+      border: 2px solid var(--line);
+      border-radius: 12px;
+      padding: 10px;
+      font-family: var(--font-head);
+      font-size: 1rem;
+      letter-spacing: 0.05em;
+      transition: background 0.15s, color 0.15s;
+    }
+    .tab:hover { background: var(--line); color: var(--cream); }
+    .tab[aria-selected="true"] { background: var(--red); border-color: var(--red); color: #fff; box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.25); }
+
+    .shop-list { display: flex; flex-direction: column; gap: 10px; overflow-y: auto; max-height: 70vh; padding-right: 4px; }
+
+    .shop-item {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 4px 12px;
+      align-items: center;
+      width: 100%;
+      text-align: left;
+      background: var(--panel-2);
+      border: 2px solid var(--line);
+      border-radius: 12px;
+      padding: 10px 14px;
+      color: var(--cream);
+      transition: background 0.15s, border-color 0.15s, transform 0.05s;
+    }
+    .shop-item:hover:not(:disabled) { background: #553620; border-color: var(--orange); }
+    .shop-item:active:not(:disabled) { transform: scale(0.98); }
+    .shop-item:disabled { opacity: 0.45; filter: grayscale(0.4); }
+    .shop-item.bought { border-color: var(--green); opacity: 0.75; }
+    .shop-item.flash { animation: buyflash 0.5s ease; }
+    @keyframes buyflash {
+      0% { box-shadow: 0 0 0 0 rgba(245, 193, 66, 0.9); }
+      100% { box-shadow: 0 0 0 16px rgba(245, 193, 66, 0); }
+    }
+
+    .shop-item .name { font-weight: 800; font-size: 0.98rem; }
+    .shop-item .desc { grid-column: 1; font-size: 0.78rem; color: var(--cream-dim); font-weight: 600; }
+    .shop-item .cost { font-family: var(--font-head); color: var(--gold); font-size: 0.95rem; white-space: nowrap; text-align: right; }
+    .shop-item .check { grid-row: 1 / span 2; grid-column: 2; font-size: 1.4rem; color: var(--green); text-align: right; }
+
+    .gen-item { grid-template-columns: 1fr auto auto; }
+    .gen-item .name { grid-column: 1; }
+    .gen-item .desc { grid-column: 1; }
+    .gen-item .cost { grid-column: 2; grid-row: 1; align-self: end; }
+    .gen-item .rate { grid-column: 2; grid-row: 2; font-size: 0.72rem; color: var(--cream-dim); font-weight: 700; text-align: right; white-space: nowrap; }
+    .gen-item .owned {
+      grid-column: 3;
+      grid-row: 1 / span 2;
+      min-width: 38px;
+      font-family: var(--font-head);
+      font-size: 1.5rem;
+      color: var(--orange);
+      text-align: right;
+    }
+
+    /* ---------- Toast ---------- */
+    .toast-wrap { position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 8px; z-index: 100; pointer-events: none; }
+    .toast {
+      background: var(--cream);
+      color: #3a2310;
+      font-weight: 800;
+      padding: 10px 18px;
+      border-radius: 999px;
+      box-shadow: var(--shadow);
+      animation: toastIn 0.25s ease, toastOut 0.3s ease 2.2s forwards;
+      white-space: nowrap;
+    }
+    .toast.bad { background: var(--red); color: #fff; }
+    .toast.good { background: var(--gold); }
+    @keyframes toastIn { from { opacity: 0; transform: translateY(14px) scale(0.9); } }
+    @keyframes toastOut { to { opacity: 0; transform: translateY(10px); } }
+
+    /* ---------- Modal ---------- */
+    .modal-backdrop {
+      position: fixed; inset: 0;
+      background: rgba(0, 0, 0, 0.65);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 200;
+      padding: 20px;
+    }
+    .modal-backdrop.open { display: flex; }
+    .modal {
+      background: var(--panel);
+      border: 3px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 24px;
+      max-width: 420px;
+      width: 100%;
+      text-align: center;
+      animation: toastIn 0.2s ease;
+    }
+    .modal h2 { color: var(--gold); font-size: 1.4rem; margin-bottom: 10px; }
+    .modal p { color: var(--cream-dim); font-weight: 600; margin-bottom: 20px; }
+    .modal .actions { display: flex; gap: 10px; justify-content: center; }
+    .btn-secondary {
+      background: var(--panel-2);
+      color: var(--cream);
+      border: 2px solid var(--line);
+      border-radius: 12px;
+      padding: 10px 18px;
+      font-weight: 800;
+      transition: background 0.15s;
+    }
+    .btn-secondary:hover { background: var(--line); }
+    .btn-secondary:active { transform: translateY(1px); }
+
+    /* ---------- Responsive ---------- */
+    @media (max-width: 1080px) {
+      .game { grid-template-columns: 1fr 1fr; }
+      .clicker-panel { grid-column: 1 / -1; grid-row: 1; min-height: 340px; }
+    }
+    @media (max-width: 680px) {
+      .game { grid-template-columns: 1fr; padding: 12px; gap: 12px; }
+      .clicker-panel { grid-column: 1; }
+      .topbar { padding: 10px 12px; }
+      .topstat { min-width: 110px; padding: 4px 10px; }
+      .shop-list { max-height: none; }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <h1>Chef's Schokoelsen Bons Feast</h1>
+    <div class="topstats">
+      <div class="topstat">
+        <div class="label">Gesamte Schokoelsen Bons</div>
+        <div class="value" id="top-total">0</div>
+      </div>
+      <div class="topstat">
+        <div class="label">Schokoelsen Bons pro Sekunde</div>
+        <div class="value" id="top-bps">0</div>
+      </div>
+      <button class="btn-sound" id="btn-sound" aria-pressed="false" title="Chef-Stimme an/aus">🔇 Stimme</button>
+      <button class="btn-reset" id="btn-reset">Zurücksetzen</button>
+    </div>
+  </header>
+
+  <main class="game">
+    <!-- Links: Chef -->
+    <section class="panel chef-panel" aria-label="Chef">
+      <div class="bubble" id="bubble" role="status" aria-live="polite"></div>
+      <div class="chef-figure" id="chef-figure">
+        <img src="/chef.png" alt="Chef, hungrig auf Schokoelsen Bons" />
+      </div>
+      <div class="chef-caption">Chef will Schokoelsen Bons futtern!</div>
+      <div class="stats">
+        <div class="stat-row">
+          <span class="label">Gesamte Schokoelsen Bons</span>
+          <span class="value" id="stat-total">0</span>
+        </div>
+        <div class="stat-row">
+          <span class="label">Schokoelsen Bons pro Sekunde</span>
+          <span class="value" id="stat-bps">0</span>
+        </div>
+        <div class="stat-row">
+          <span class="label">Schokoelsen Bons pro Klick</span>
+          <span class="value" id="stat-bpc">1</span>
+        </div>
+        <div class="stat-row">
+          <span class="label">Klicks insgesamt</span>
+          <span class="value" id="stat-clicks">0</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Mitte: Klick-Objekt -->
+    <section class="panel clicker-panel" aria-label="Schokoelsen Bons anklicken" id="clicker-panel">
+      <div class="big-count">
+        <span id="big-total">0</span>
+        <small>Schokoelsen Bons</small>
+      </div>
+      <button class="bons-btn" id="bons-btn" aria-label="Schokoelsen Bons anklicken">
+        <img src="/bons.jpg" alt="Ein riesiges Schokoelsen Bon" />
+      </button>
+      <div class="click-hint">Klick die Schokoelsen Bons — Chef hat Hunger!</div>
+    </section>
+
+    <!-- Rechts: Laden -->
+    <section class="panel shop" aria-label="Laden">
+      <div class="tabs" role="tablist">
+        <button class="tab" id="tab-gen" role="tab" aria-selected="true" aria-controls="list-gen">Generatoren</button>
+        <button class="tab" id="tab-upg" role="tab" aria-selected="false" aria-controls="list-upg">Upgrades</button>
+      </div>
+      <div class="shop-list" id="list-gen" role="tabpanel" aria-labelledby="tab-gen"></div>
+      <div class="shop-list" id="list-upg" role="tabpanel" aria-labelledby="tab-upg" hidden></div>
+    </section>
+  </main>
+
+  <div class="toast-wrap" id="toast-wrap"></div>
+
+  <div class="modal-backdrop" id="modal-reset">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+      <h2 id="modal-title">Alles zurücksetzen?</h2>
+      <p>Alle Schokoelsen Bons, Generatoren und Upgrades gehen verloren. Chef wird sehr traurig sein.</p>
+      <div class="actions">
+        <button class="btn-secondary" id="btn-cancel-reset">Abbrechen</button>
+        <button class="btn-reset" id="btn-confirm-reset">Ja, zurücksetzen</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    "use strict";
+
+    /* =================== Daten =================== */
+
+    const GENERATORS = [
+      { id: "snackhand", name: "Snackhand",             baseCost: 15,    rate: 0.1 },
+      { id: "schublade", name: "Naschschublade",        baseCost: 100,   rate: 0.5 },
+      { id: "lager",     name: "Süßigkeitenlager",      baseCost: 500,   rate: 2 },
+      { id: "vorrat",    name: "Familienvorrat",        baseCost: 2000,  rate: 8 },
+      { id: "versteck",  name: "Chef's Geheimversteck", baseCost: 10000, rate: 25 },
+      { id: "portal",    name: "Schokoelsen Portal",    baseCost: 50000, rate: 100 },
+    ];
+    const COST_GROWTH = 1.15;
+
+    const UPGRADES = [
+      { id: "biss",    name: "Größerer Biss",          cost: 100,    desc: "Klick-Wert verdoppelt" },
+      { id: "zahn",    name: "Süßer Zahn",             cost: 500,    desc: "Snackhand-Produktion verdoppelt" },
+      { id: "packung", name: "Vorratspackung",         cost: 2500,   desc: "Alle Generatoren +50%" },
+      { id: "hunger",  name: "Hungriger Chef",         cost: 10000,  desc: "Klick-Wert x5" },
+      { id: "masse",   name: "Massenlieferung",        cost: 50000,  desc: "Alle Generatoren x2" },
+      { id: "mampf",   name: "Ultimativer Mampfmodus", cost: 250000, desc: "Gesamte Produktion x3" },
+    ];
+
+    const MILESTONES = [
+      { at: 100,     line: "100 Schokoelsen Bons! Jetzt wird richtig gefuttert!" },
+      { at: 1000,    line: "1.000 Schokoelsen Bons! Chef will noch mehr mampfen!" },
+      { at: 10000,   line: "10.000 Schokoelsen Bons! Diese Schokoelsen Bons verschwinden sofort!" },
+      { at: 100000,  line: "100.000 Schokoelsen Bons! Niemand stoppt diesen Snack-Rausch!" },
+      { at: 1000000, line: "1.000.000 Schokoelsen Bons! Chef ist im Schokoelsen-Himmel!" },
+    ];
+
+    const CLICK_LINES = [
+      "Mehr Schokoelsen Bons!",
+      "Chef will noch mehr mampfen!",
+      "Jetzt wird richtig gefuttert!",
+      "Diese Schokoelsen Bons verschwinden sofort!",
+      "Niemand stoppt diesen Snack-Rausch!",
+      "Mmmh, direkt in Chefs Bauch!",
+      "Schokoelsen Bons sind Lebenselixier!",
+      "Her mit dem süßen Zeug!",
+    ];
+
+    const RARE_LINE = "Lak werd Mann du Hund";
+
+    /* =================== State (nur im Speicher) =================== */
+
+    const initialState = () => ({
+      bons: 0,
+      lifetime: 0,
+      clicks: 0,
+      gens: Object.fromEntries(GENERATORS.map((g) => [g.id, 0])),
+      upgrades: Object.fromEntries(UPGRADES.map((u) => [u.id, false])),
+      milestonesHit: Object.fromEntries(MILESTONES.map((m) => [m.at, false])),
+    });
+
+    let state = initialState();
+    let voiceOn = false;
+
+    /* =================== Berechnungen =================== */
+
+    function genRate(g) {
+      let rate = g.rate * state.gens[g.id];
+      if (g.id === "snackhand" && state.upgrades.zahn) rate *= 2;
+      if (state.upgrades.packung) rate *= 1.5;
+      if (state.upgrades.masse) rate *= 2;
+      if (state.upgrades.mampf) rate *= 3;
+      return rate;
+    }
+
+    function totalBps() {
+      return GENERATORS.reduce((sum, g) => sum + genRate(g), 0);
+    }
+
+    function clickValue() {
+      let v = 1;
+      if (state.upgrades.biss) v *= 2;
+      if (state.upgrades.hunger) v *= 5;
+      if (state.upgrades.mampf) v *= 3;
+      return v;
+    }
+
+    function genCost(g) {
+      return Math.ceil(g.baseCost * Math.pow(COST_GROWTH, state.gens[g.id]));
+    }
+
+    /* =================== Formatierung (K/M/B/T) =================== */
+
+    function fmt(n) {
+      if (n < 1000) {
+        return n % 1 === 0 ? String(n) : n.toFixed(1).replace(".", ",");
+      }
+      const units = [
+        { v: 1e12, s: "T" },
+        { v: 1e9, s: "B" },
+        { v: 1e6, s: "M" },
+        { v: 1e3, s: "K" },
+      ];
+      for (const u of units) {
+        if (n >= u.v) {
+          const x = n / u.v;
+          return (x >= 100 ? x.toFixed(0) : x.toFixed(1)).replace(".", ",") + u.s;
+        }
+      }
+      return String(Math.floor(n));
+    }
+
+    /* =================== DOM =================== */
+
+    const $ = (id) => document.getElementById(id);
+    const els = {
+      topTotal: $("top-total"), topBps: $("top-bps"),
+      statTotal: $("stat-total"), statBps: $("stat-bps"),
+      statBpc: $("stat-bpc"), statClicks: $("stat-clicks"),
+      bigTotal: $("big-total"),
+      bonsBtn: $("bons-btn"), clickerPanel: $("clicker-panel"),
+      chefFigure: $("chef-figure"), bubble: $("bubble"),
+      listGen: $("list-gen"), listUpg: $("list-upg"),
+      tabGen: $("tab-gen"), tabUpg: $("tab-upg"),
+      toastWrap: $("toast-wrap"),
+      modalReset: $("modal-reset"),
+      btnSound: $("btn-sound"),
+    };
+
+    /* =================== Laden aufbauen =================== */
+
+    const genButtons = {};
+    for (const g of GENERATORS) {
+      const btn = document.createElement("button");
+      btn.className = "shop-item gen-item";
+      btn.innerHTML =
+        '<span class="name"></span>' +
+        '<span class="cost"></span>' +
+        '<span class="owned"></span>' +
+        '<span class="desc"></span>' +
+        '<span class="rate"></span>';
+      btn.querySelector(".name").textContent = g.name;
+      btn.addEventListener("click", () => buyGenerator(g, btn));
+      els.listGen.appendChild(btn);
+      genButtons[g.id] = btn;
+    }
+
+    const upgButtons = {};
+    for (const u of UPGRADES) {
+      const btn = document.createElement("button");
+      btn.className = "shop-item";
+      btn.innerHTML =
+        '<span class="name"></span>' +
+        '<span class="cost"></span>' +
+        '<span class="desc"></span>';
+      btn.querySelector(".name").textContent = u.name;
+      btn.querySelector(".desc").textContent = u.desc;
+      btn.querySelector(".cost").textContent = fmt(u.cost);
+      btn.addEventListener("click", () => buyUpgrade(u, btn));
+      els.listUpg.appendChild(btn);
+      upgButtons[u.id] = btn;
+    }
+
+    function refreshShop() {
+      for (const g of GENERATORS) {
+        const btn = genButtons[g.id];
+        const cost = genCost(g);
+        btn.querySelector(".cost").textContent = fmt(cost);
+        btn.querySelector(".owned").textContent = state.gens[g.id];
+        btn.querySelector(".desc").textContent = "+" + fmt(g.rate) + " Schokoelsen Bons/Sek pro Stück";
+        btn.querySelector(".rate").textContent = "aktuell: " + fmt(genRate(g)) + "/Sek";
+        btn.disabled = state.bons < cost;
+      }
+      for (const u of UPGRADES) {
+        const btn = upgButtons[u.id];
+        if (state.upgrades[u.id]) {
+          btn.classList.add("bought");
+          btn.disabled = true;
+          if (!btn.querySelector(".check")) {
+            const check = document.createElement("span");
+            check.className = "check";
+            check.textContent = "✔";
+            btn.querySelector(".cost").replaceWith(check);
+          }
+        } else {
+          btn.disabled = state.bons < u.cost;
+        }
+      }
+    }
+
+    /* =================== Kaufen =================== */
+
+    function flash(btn) {
+      btn.classList.remove("flash");
+      void btn.offsetWidth;
+      btn.classList.add("flash");
+    }
+
+    function buyGenerator(g, btn) {
+      const cost = genCost(g);
+      if (state.bons < cost) {
+        toast("Nicht genug Schokoelsen Bons", "bad");
+        return;
+      }
+      state.bons -= cost;
+      state.gens[g.id]++;
+      flash(btn);
+      chefReact("munch");
+      if (Math.random() < 0.3) say(pick(CLICK_LINES));
+      refreshShop();
+      render();
+    }
+
+    function buyUpgrade(u, btn) {
+      if (state.upgrades[u.id]) return;
+      if (state.bons < u.cost) {
+        toast("Nicht genug Schokoelsen Bons", "bad");
+        return;
+      }
+      state.bons -= u.cost;
+      state.upgrades[u.id] = true;
+      flash(btn);
+      toast("Chef hat wieder Schokoelsen Bons gefuttert!", "good");
+      chefReact("hyped");
+      say(Math.random() < 0.25 ? RARE_LINE : pick(CLICK_LINES));
+      refreshShop();
+      render();
+    }
+
+    /* =================== Klicken =================== */
+
+    els.bonsBtn.addEventListener("click", (e) => {
+      const gain = clickValue();
+      state.bons += gain;
+      state.lifetime += gain;
+      state.clicks++;
+
+      els.bonsBtn.classList.remove("pop");
+      void els.bonsBtn.offsetWidth;
+      els.bonsBtn.classList.add("pop");
+
+      spawnFloat(e, "+" + fmt(gain));
+      chefReact("munch");
+
+      if (Math.random() < 0.012) {
+        say(RARE_LINE);
+      } else if (Math.random() < 0.06) {
+        say(pick(CLICK_LINES));
+      }
+
+      checkMilestones();
+      refreshShop();
+      render();
+    });
+
+    function spawnFloat(e, text) {
+      const rect = els.clickerPanel.getBoundingClientRect();
+      const el = document.createElement("span");
+      el.className = "float-num";
+      el.textContent = text;
+      const x = (e.clientX || rect.left + rect.width / 2) - rect.left;
+      const y = (e.clientY || rect.top + rect.height / 2) - rect.top;
+      el.style.left = x + (Math.random() * 28 - 14) + "px";
+      el.style.top = y - 10 + "px";
+      els.clickerPanel.appendChild(el);
+      setTimeout(() => el.remove(), 1000);
+    }
+
+    /* =================== Chef-Reaktionen =================== */
+
+    function chefReact(cls) {
+      els.chefFigure.classList.remove("munch", "hyped");
+      void els.chefFigure.offsetWidth;
+      els.chefFigure.classList.add(cls);
+    }
+
+    function pick(arr) {
+      return arr[Math.floor(Math.random() * arr.length)];
+    }
+
+    let bubbleTimer = null;
+    function say(line, milestone = false) {
+      els.bubble.textContent = line;
+      els.bubble.classList.toggle("milestone", milestone);
+      els.bubble.classList.add("show");
+      clearTimeout(bubbleTimer);
+      bubbleTimer = setTimeout(() => els.bubble.classList.remove("show"), milestone ? 5000 : 3200);
+      speak(line);
+    }
+
+    /* Optionale Sprachausgabe (Web Speech API) — das Spiel funktioniert auch komplett ohne Audio. */
+    function speak(line) {
+      if (!voiceOn || !("speechSynthesis" in window)) return;
+      try {
+        window.speechSynthesis.cancel();
+        const utter = new SpeechSynthesisUtterance(line);
+        utter.lang = "de-DE";
+        utter.pitch = 0.4; /* tiefe Chef-Stimme */
+        utter.rate = 0.9;
+        const voices = window.speechSynthesis.getVoices();
+        const deep =
+          voices.find((v) => v.lang.startsWith("de") && /male|mann|stefan|markus|conrad/i.test(v.name)) ||
+          voices.find((v) => v.lang.startsWith("de"));
+        if (deep) utter.voice = deep;
+        window.speechSynthesis.speak(utter);
+      } catch (err) {
+        /* Audio ist optional */
+      }
+    }
+
+    els.btnSound.addEventListener("click", () => {
+      voiceOn = !voiceOn;
+      els.btnSound.setAttribute("aria-pressed", String(voiceOn));
+      els.btnSound.textContent = voiceOn ? "🔊 Stimme" : "🔇 Stimme";
+      if (voiceOn) say("Chef ist bereit zum Futtern!");
+    });
+
+    /* Gelegentliche Idle-Reaktion — selten, nicht spammy */
+    function scheduleIdleLine() {
+      const delay = 25000 + Math.random() * 35000;
+      setTimeout(() => {
+        if (!document.hidden) {
+          say(Math.random() < 0.15 ? RARE_LINE : pick(CLICK_LINES));
+          chefReact(Math.random() < 0.5 ? "munch" : "hyped");
+        }
+        scheduleIdleLine();
+      }, delay);
+    }
+    scheduleIdleLine();
+
+    /* =================== Meilensteine =================== */
+
+    function checkMilestones() {
+      for (const m of MILESTONES) {
+        if (!state.milestonesHit[m.at] && state.lifetime >= m.at) {
+          state.milestonesHit[m.at] = true;
+          say(m.line, true);
+          toast("Chef hat wieder Schokoelsen Bons gefuttert!", "good");
+          chefReact("hyped");
+        }
+      }
+    }
+
+    /* =================== Toast =================== */
+
+    let lastBadToast = 0;
+    function toast(text, kind) {
+      if (kind === "bad") {
+        const now = Date.now();
+        if (now - lastBadToast < 800) return;
+        lastBadToast = now;
+      }
+      const el = document.createElement("div");
+      el.className = "toast " + (kind || "");
+      el.textContent = text;
+      els.toastWrap.appendChild(el);
+      setTimeout(() => el.remove(), 2700);
+    }
+
+    /* =================== Zurücksetzen =================== */
+
+    $("btn-reset").addEventListener("click", () => els.modalReset.classList.add("open"));
+    $("btn-cancel-reset").addEventListener("click", () => els.modalReset.classList.remove("open"));
+    els.modalReset.addEventListener("click", (e) => {
+      if (e.target === els.modalReset) els.modalReset.classList.remove("open");
+    });
+    $("btn-confirm-reset").addEventListener("click", () => {
+      state = initialState();
+      displayed.bons = 0;
+      els.modalReset.classList.remove("open");
+      for (const u of UPGRADES) {
+        const btn = upgButtons[u.id];
+        btn.classList.remove("bought");
+        const check = btn.querySelector(".check");
+        if (check) {
+          const cost = document.createElement("span");
+          cost.className = "cost";
+          cost.textContent = fmt(u.cost);
+          check.replaceWith(cost);
+        }
+      }
+      say("Alles weg?! Chef fängt nochmal von vorne an zu futtern!");
+      chefReact("munch");
+      refreshShop();
+      render();
+    });
+
+    /* =================== Render & Spielschleife =================== */
+
+    const displayed = { bons: 0 };
+
+    function render() {
+      const bps = totalBps();
+      els.topBps.textContent = fmt(bps);
+      els.statBps.textContent = fmt(bps);
+      els.statBpc.textContent = fmt(clickValue());
+      els.statClicks.textContent = fmt(state.clicks);
+    }
+
+    let lastTick = performance.now();
+    let lastShopRefresh = 0;
+
+    function loop(now) {
+      const dt = Math.min((now - lastTick) / 1000, 1);
+      lastTick = now;
+
+      const gain = totalBps() * dt;
+      if (gain > 0) {
+        state.bons += gain;
+        state.lifetime += gain;
+        checkMilestones();
+      }
+
+      /* Zähler weich animieren */
+      const diff = state.bons - displayed.bons;
+      displayed.bons += Math.abs(diff) < 0.01 ? diff : diff * Math.min(1, dt * 8);
+
+      const txt = fmt(Math.floor(displayed.bons));
+      els.topTotal.textContent = txt;
+      els.statTotal.textContent = txt;
+      els.bigTotal.textContent = txt;
+
+      if (now - lastShopRefresh > 250) {
+        lastShopRefresh = now;
+        refreshShop();
+      }
+
+      requestAnimationFrame(loop);
+    }
+
+    refreshShop();
+    render();
+    requestAnimationFrame(loop);
+
+    /* =================== Tabs =================== */
+
+    function selectTab(genActive) {
+      els.tabGen.setAttribute("aria-selected", String(genActive));
+      els.tabUpg.setAttribute("aria-selected", String(!genActive));
+      els.listGen.hidden = !genActive;
+      els.listUpg.hidden = genActive;
+    }
+    els.tabGen.addEventListener("click", () => selectTab(true));
+    els.tabUpg.addEventListener("click", () => selectTab(false));
+
+    /* Begrüßung */
+    setTimeout(() => say("Her mit den Schokoelsen Bons!"), 600);
+  </script>
+</body>
 </html>

@@ -1,6 +1,6 @@
 {
-  "name": "vite-starter",
-  "version": "0.0.0",
+  "name": "chefs-schokoelsen-bons-feast",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -10,9 +10,5 @@
   },
   "devDependencies": {
     "vite": "^8.0.10"
-  },
-  "dependencies": {
-    "@supabase/supabase-js": "^2.105.1",
-    "gif.js": "^0.2.0"
   }
 }
