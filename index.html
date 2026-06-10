@@ -373,41 +373,110 @@
 
     .shop-item {
       display: grid;
-      grid-template-columns: 1fr auto;
-      gap: 3px 12px;
+      grid-template-columns: auto minmax(0, 1fr) auto;
+      grid-template-areas:
+        "icon name  cost"
+        "icon desc  cost";
+      gap: 2px 10px;
       align-items: center;
       width: 100%;
+      min-height: 58px;
       text-align: left;
       background: var(--panel-2);
       border: 2px solid var(--line);
       border-radius: 12px;
-      padding: 9px 13px;
+      padding: 9px 11px;
       color: var(--cream);
       flex: none;
       transition: background 0.15s, border-color 0.15s, transform 0.05s;
     }
     .shop-item:hover:not(:disabled) { background: #553620; border-color: var(--orange); }
     .shop-item:active:not(:disabled) { transform: scale(0.98); }
-    .shop-item:disabled { opacity: 0.45; filter: grayscale(0.4); }
-    .shop-item.bought { border-color: var(--green); opacity: 0.75; }
+    .shop-item:disabled { opacity: 0.6; filter: grayscale(0.3); }
+    .shop-item.bought { border-color: var(--green); }
+    .shop-item.bought:disabled { opacity: 0.85; filter: none; }
     .shop-item.flash { animation: buyflash 0.5s ease; }
     @keyframes buyflash {
       0% { box-shadow: 0 0 0 0 rgba(245, 193, 66, 0.9); }
       100% { box-shadow: 0 0 0 16px rgba(245, 193, 66, 0); }
     }
 
-    .shop-item .name { font-weight: 800; font-size: 0.95rem; }
-    .shop-item .desc { grid-column: 1; font-size: 0.75rem; color: var(--cream-dim); font-weight: 600; }
-    .shop-item .cost { font-family: var(--font-head); color: var(--gold); font-size: 0.92rem; white-space: nowrap; text-align: right; }
-    .shop-item .check { grid-row: 1 / span 2; grid-column: 2; font-size: 1.4rem; color: var(--green); text-align: right; }
+    .shop-item .icon {
+      grid-area: icon;
+      width: 38px;
+      height: 38px;
+      border-radius: 10px;
+      background: rgba(0, 0, 0, 0.25);
+      border: 2px solid var(--line);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.25rem;
+    }
+    .shop-item .name {
+      grid-area: name;
+      font-weight: 800;
+      font-size: 0.92rem;
+      line-height: 1.2;
+      align-self: end;
+      overflow-wrap: anywhere;
+    }
+    .shop-item .desc {
+      grid-area: desc;
+      font-size: 0.74rem;
+      color: var(--cream-dim);
+      font-weight: 700;
+      line-height: 1.25;
+      align-self: start;
+      overflow-wrap: anywhere;
+    }
+    .shop-item .cost {
+      grid-area: cost;
+      justify-self: end;
+      font-family: var(--font-head);
+      color: #2b1a10;
+      background: var(--gold);
+      border-bottom: 3px solid #b88a1e;
+      border-radius: 10px;
+      padding: 5px 10px 3px;
+      font-size: 0.92rem;
+      white-space: nowrap;
+      text-align: center;
+      min-width: 56px;
+    }
+    .shop-item:disabled .cost { background: var(--line); color: var(--cream-dim); border-bottom-color: #3a2516; }
+    .shop-item .check {
+      grid-area: cost;
+      justify-self: end;
+      font-size: 1rem;
+      font-weight: 800;
+      color: #2b1a10;
+      background: var(--green);
+      border-bottom: 3px solid #4f7a3c;
+      border-radius: 10px;
+      padding: 5px 10px 3px;
+      white-space: nowrap;
+    }
 
-    .gen-item { grid-template-columns: 1fr auto auto; }
-    .gen-item .cost { grid-column: 2; grid-row: 1; align-self: end; }
-    .gen-item .rate { grid-column: 2; grid-row: 2; font-size: 0.7rem; color: var(--cream-dim); font-weight: 700; text-align: right; white-space: nowrap; }
+    .gen-item {
+      grid-template-columns: auto minmax(0, 1fr) auto auto;
+      grid-template-areas:
+        "icon name  cost owned"
+        "icon desc  rate owned";
+    }
+    .gen-item .cost { align-self: end; }
+    .gen-item .rate {
+      grid-area: rate;
+      justify-self: end;
+      align-self: start;
+      font-size: 0.68rem;
+      color: var(--cream-dim);
+      font-weight: 700;
+      white-space: nowrap;
+    }
     .gen-item .owned {
-      grid-column: 3;
-      grid-row: 1 / span 2;
-      min-width: 36px;
+      grid-area: owned;
+      min-width: 34px;
       font-family: var(--font-head);
       font-size: 1.45rem;
       color: var(--orange);
@@ -562,22 +631,22 @@
     /* =================== Daten =================== */
 
     const GENERATORS = [
-      { id: "snackhand", name: "Snackhand",             baseCost: 15,    rate: 0.1 },
-      { id: "schublade", name: "Naschschublade",        baseCost: 100,   rate: 0.5 },
-      { id: "lager",     name: "Süßigkeitenlager",      baseCost: 500,   rate: 2 },
-      { id: "vorrat",    name: "Familienvorrat",        baseCost: 2000,  rate: 8 },
-      { id: "versteck",  name: "Chef's Geheimversteck", baseCost: 10000, rate: 25 },
-      { id: "portal",    name: "Schokoelsen Portal",    baseCost: 50000, rate: 100 },
+      { id: "snackhand", name: "Snackhand",             baseCost: 15,    rate: 0.1, icon: "✋" },
+      { id: "schublade", name: "Naschschublade",        baseCost: 100,   rate: 0.5, icon: "🗄️" },
+      { id: "lager",     name: "Süßigkeitenlager",      baseCost: 500,   rate: 2,   icon: "🏪" },
+      { id: "vorrat",    name: "Familienvorrat",        baseCost: 2000,  rate: 8,   icon: "📦" },
+      { id: "versteck",  name: "Chef's Geheimversteck", baseCost: 10000, rate: 25,  icon: "🗝️" },
+      { id: "portal",    name: "Schokoelsen Portal",    baseCost: 50000, rate: 100, icon: "🌀" },
     ];
     const COST_GROWTH = 1.15;
 
     const UPGRADES = [
-      { id: "biss",    name: "Größerer Biss",          cost: 100,    desc: "Klick-Wert verdoppelt" },
-      { id: "zahn",    name: "Süßer Zahn",             cost: 500,    desc: "Snackhand-Produktion verdoppelt" },
-      { id: "packung", name: "Vorratspackung",         cost: 2500,   desc: "Alle Generatoren +50%" },
-      { id: "hunger",  name: "Hungriger Chef",         cost: 10000,  desc: "Klick-Wert x5" },
-      { id: "masse",   name: "Massenlieferung",        cost: 50000,  desc: "Alle Generatoren x2" },
-      { id: "mampf",   name: "Ultimativer Mampfmodus", cost: 250000, desc: "Gesamte Produktion x3" },
+      { id: "biss",    name: "Größerer Biss",          cost: 100,    desc: "Klick-Wert verdoppelt",            icon: "👄" },
+      { id: "zahn",    name: "Süßer Zahn",             cost: 500,    desc: "Snackhand-Produktion verdoppelt",  icon: "🦷" },
+      { id: "packung", name: "Vorratspackung",         cost: 2500,   desc: "Alle Generatoren +50%",            icon: "🎁" },
+      { id: "hunger",  name: "Hungriger Chef",         cost: 10000,  desc: "Klick-Wert x5",                    icon: "🍴" },
+      { id: "masse",   name: "Massenlieferung",        cost: 50000,  desc: "Alle Generatoren x2",              icon: "🚚" },
+      { id: "mampf",   name: "Ultimativer Mampfmodus", cost: 250000, desc: "Gesamte Produktion x3",            icon: "🔥" },
     ];
 
     const MILESTONES = [
@@ -694,11 +763,13 @@
       const btn = document.createElement("button");
       btn.className = "shop-item gen-item";
       btn.innerHTML =
+        '<span class="icon"></span>' +
         '<span class="name"></span>' +
         '<span class="cost"></span>' +
         '<span class="owned"></span>' +
         '<span class="desc"></span>' +
         '<span class="rate"></span>';
+      btn.querySelector(".icon").textContent = g.icon;
       btn.querySelector(".name").textContent = g.name;
       btn.addEventListener("click", () => buyGenerator(g, btn));
       els.listGen.appendChild(btn);
@@ -710,9 +781,11 @@
       const btn = document.createElement("button");
       btn.className = "shop-item";
       btn.innerHTML =
+        '<span class="icon"></span>' +
         '<span class="name"></span>' +
         '<span class="cost"></span>' +
         '<span class="desc"></span>';
+      btn.querySelector(".icon").textContent = u.icon;
       btn.querySelector(".name").textContent = u.name;
       btn.querySelector(".desc").textContent = u.desc;
       btn.querySelector(".cost").textContent = fmt(u.cost);
