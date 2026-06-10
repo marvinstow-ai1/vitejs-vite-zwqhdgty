@@ -11,7 +11,6 @@
   <style>
     :root {
       --bg: #2b1a10;
-      --bg-deep: #1f1209;
       --panel: #3a2516;
       --panel-2: #462d1b;
       --line: #5c3d24;
@@ -23,14 +22,13 @@
       --gold: #f5c142;
       --green: #7bb661;
       --shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
-      --radius: 16px;
       --font-head: "Luckiest Guy", cursive;
       --font-body: "Nunito", sans-serif;
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    html, body { height: 100%; }
 
+    html, body { height: 100%; }
     body {
       font-family: var(--font-body);
       color: var(--cream);
@@ -38,13 +36,13 @@
         radial-gradient(1200px 600px at 50% -10%, #4a2e19 0%, transparent 60%),
         radial-gradient(900px 500px at 90% 110%, #3d2412 0%, transparent 55%),
         var(--bg);
-      min-height: 100vh;
+      height: 100dvh;
       display: flex;
       flex-direction: column;
+      overflow: hidden;
     }
 
-    h1, h2, h3 { font-family: var(--font-head); font-weight: 400; letter-spacing: 0.04em; }
-
+    h1 { font-family: var(--font-head); font-weight: 400; letter-spacing: 0.04em; }
     button { font-family: inherit; cursor: pointer; }
     button:disabled { cursor: not-allowed; }
     img { user-select: none; -webkit-user-drag: none; }
@@ -53,36 +51,22 @@
     .topbar {
       display: flex;
       align-items: center;
-      gap: 16px;
+      gap: 10px;
       flex-wrap: wrap;
-      padding: 12px 20px;
+      padding: 8px 16px;
       background: linear-gradient(180deg, #241509, #2e1c0e);
       border-bottom: 3px solid var(--line);
       box-shadow: var(--shadow);
-      position: sticky;
-      top: 0;
       z-index: 50;
+      flex: none;
     }
-
     .topbar h1 {
-      font-size: clamp(1.2rem, 3vw, 1.9rem);
+      font-size: clamp(1.05rem, 2.4vw, 1.6rem);
       color: var(--gold);
       text-shadow: 2px 3px 0 rgba(0, 0, 0, 0.5);
       flex: 1 1 auto;
+      white-space: nowrap;
     }
-
-    .topstats { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; }
-
-    .topstat {
-      background: var(--panel);
-      border: 2px solid var(--line);
-      border-radius: 12px;
-      padding: 6px 14px;
-      text-align: center;
-      min-width: 130px;
-    }
-    .topstat .label { font-size: 0.65rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--cream-dim); }
-    .topstat .value { font-family: var(--font-head); font-size: 1.15rem; color: var(--cream); }
 
     .btn-reset {
       background: var(--red);
@@ -90,9 +74,9 @@
       border: none;
       border-bottom: 4px solid #9c2c1c;
       border-radius: 12px;
-      padding: 9px 16px;
+      padding: 7px 14px;
       font-weight: 800;
-      font-size: 0.85rem;
+      font-size: 0.8rem;
       transition: background 0.15s, transform 0.05s;
     }
     .btn-reset:hover { background: var(--red-hover); }
@@ -103,54 +87,101 @@
       color: var(--cream);
       border: 2px solid var(--line);
       border-radius: 12px;
-      padding: 8px 12px;
-      font-size: 0.85rem;
+      padding: 6px 11px;
+      font-size: 0.8rem;
       font-weight: 800;
       transition: background 0.15s;
     }
     .btn-sound:hover { background: var(--line); }
     .btn-sound[aria-pressed="true"] { background: var(--orange); border-color: var(--orange); color: #2b1a10; }
 
-    /* ---------- Layout ---------- */
+    /* ---------- Layout: alles auf einem Screen ---------- */
     .game {
       flex: 1;
+      min-height: 0;
       display: grid;
-      grid-template-columns: minmax(260px, 330px) minmax(0, 1fr) minmax(300px, 380px);
-      gap: 18px;
-      padding: 18px;
+      grid-template-columns: minmax(0, 1fr) minmax(290px, 360px);
+      gap: 14px;
+      padding: 14px;
       max-width: 1500px;
       width: 100%;
       margin: 0 auto;
     }
 
-    .panel {
+    /* ---------- Bühne: Chef + Bon zusammen ---------- */
+    .stage {
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
       background: var(--panel);
       border: 2px solid var(--line);
-      border-radius: var(--radius);
+      border-radius: 16px;
       box-shadow: var(--shadow);
-      padding: 16px;
+      padding: 12px 16px;
+      position: relative;
+      overflow: hidden;
     }
 
-    /* ---------- Chef panel ---------- */
-    .chef-panel { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+    .statsbar {
+      display: flex;
+      gap: 8px;
+      flex-wrap: nowrap;
+      overflow-x: auto;
+      scrollbar-width: none;
+      flex: none;
+    }
+    .statsbar::-webkit-scrollbar { display: none; }
+    .stat {
+      flex: 1 1 0;
+      min-width: 128px;
+      background: var(--panel-2);
+      border: 2px solid var(--line);
+      border-radius: 10px;
+      padding: 5px 10px;
+      text-align: center;
+    }
+    .stat .label { font-size: 0.58rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.07em; color: var(--cream-dim); white-space: nowrap; }
+    .stat .value { font-family: var(--font-head); font-size: 1.1rem; color: var(--cream); line-height: 1.1; }
+
+    .arena {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      align-items: stretch;
+      gap: 8px;
+    }
+
+    /* --- Chef-Zone --- */
+    .chef-zone {
+      flex: 0 0 38%;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 8px;
+      position: relative;
+    }
 
     .bubble {
       position: relative;
       background: var(--cream);
       color: #3a2310;
       border-radius: 14px;
-      padding: 12px 16px;
+      padding: 9px 13px;
       font-weight: 800;
-      font-size: 0.95rem;
+      font-size: clamp(0.78rem, 1.4vw, 0.95rem);
       text-align: center;
-      width: 100%;
-      min-height: 52px;
+      max-width: 100%;
+      min-height: 44px;
       display: flex;
       align-items: center;
       justify-content: center;
       opacity: 0;
       transform: translateY(8px) scale(0.92);
       transition: opacity 0.25s ease, transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+      z-index: 5;
     }
     .bubble::after {
       content: "";
@@ -166,72 +197,69 @@
     .bubble.milestone { background: var(--gold); box-shadow: 0 0 24px rgba(245, 193, 66, 0.55); }
     .bubble.milestone::after { border-top-color: var(--gold); }
 
-    .chef-figure { position: relative; width: min(220px, 60vw); }
-    .chef-figure img { width: 100%; display: block; filter: drop-shadow(0 10px 14px rgba(0, 0, 0, 0.5)); }
+    .chef-figure {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      width: 100%;
+      animation: idleSway 4.5s ease-in-out infinite;
+      transform-origin: 50% 95%;
+    }
+    .chef-figure img {
+      max-height: 100%;
+      max-width: 100%;
+      object-fit: contain;
+      border-radius: 18px;
+      border: 4px solid var(--line);
+      box-shadow: 0 14px 26px rgba(0, 0, 0, 0.5);
+      background: #fff;
+    }
+    @keyframes idleSway {
+      0%, 100% { transform: rotate(-1.2deg); }
+      50% { transform: rotate(1.2deg); }
+    }
 
-    .chef-figure.munch { animation: munch 0.45s ease; }
+    .chef-figure.munch { animation: munch 0.4s ease; }
     @keyframes munch {
       0% { transform: rotate(0) scale(1); }
-      25% { transform: rotate(-4deg) scale(1.05, 0.95); }
-      50% { transform: rotate(3deg) scale(0.97, 1.04); }
-      75% { transform: rotate(-2deg) scale(1.03, 0.98); }
+      30% { transform: rotate(-3deg) scale(1.06, 0.93); }
+      60% { transform: rotate(2deg) scale(0.96, 1.05); }
       100% { transform: rotate(0) scale(1); }
     }
     .chef-figure.hyped { animation: hyped 0.9s ease; }
     @keyframes hyped {
       0%, 100% { transform: translateY(0) rotate(0); filter: none; }
-      20% { transform: translateY(-14px) rotate(-5deg); }
+      20% { transform: translateY(-16px) rotate(-5deg); }
       40% { transform: translateY(0) rotate(4deg); }
-      60% { transform: translateY(-9px) rotate(-3deg); filter: drop-shadow(0 0 18px rgba(245, 193, 66, 0.8)); }
+      60% { transform: translateY(-10px) rotate(-3deg); filter: drop-shadow(0 0 18px rgba(245, 193, 66, 0.8)); }
       80% { transform: translateY(0) rotate(2deg); }
     }
 
-    .chef-caption {
-      font-family: var(--font-head);
-      color: var(--orange);
-      font-size: 1.05rem;
-      text-align: center;
-      text-shadow: 1px 2px 0 rgba(0, 0, 0, 0.5);
-    }
-
-    .stats { width: 100%; display: flex; flex-direction: column; gap: 8px; }
-    .stat-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: baseline;
-      gap: 10px;
-      background: var(--panel-2);
-      border: 2px solid var(--line);
-      border-radius: 10px;
-      padding: 8px 12px;
-    }
-    .stat-row .label { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--cream-dim); }
-    .stat-row .value { font-family: var(--font-head); font-size: 1.05rem; color: var(--cream); white-space: nowrap; }
-
-    /* ---------- Clicker ---------- */
-    .clicker-panel {
+    /* --- Bon-Zone --- */
+    .bon-zone {
+      flex: 1;
+      min-width: 0;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      gap: 18px;
-      position: relative;
-      overflow: hidden;
-      min-height: 420px;
+      gap: clamp(6px, 1.5vh, 16px);
     }
 
     .big-count {
       font-family: var(--font-head);
-      font-size: clamp(1.9rem, 4.5vw, 3rem);
+      font-size: clamp(1.5rem, 3.6vw, 2.6rem);
       color: var(--gold);
       text-shadow: 2px 4px 0 rgba(0, 0, 0, 0.5);
       text-align: center;
       line-height: 1;
     }
-    .big-count small { display: block; font-size: 0.42em; color: var(--cream-dim); margin-top: 6px; letter-spacing: 0.06em; }
+    .big-count small { display: block; font-size: 0.42em; color: var(--cream-dim); margin-top: 5px; letter-spacing: 0.06em; }
 
     .bons-btn {
-      width: min(320px, 70vw);
+      width: min(34vh, 300px, 56vw);
       aspect-ratio: 1;
       border-radius: 50%;
       border: 6px solid var(--gold);
@@ -242,29 +270,69 @@
       transition: transform 0.08s ease, box-shadow 0.2s ease;
       touch-action: manipulation;
       -webkit-tap-highlight-color: transparent;
+      animation: bonPulse 3s ease-in-out infinite;
+    }
+    @keyframes bonPulse {
+      0%, 100% { box-shadow: 0 0 0 10px rgba(245, 193, 66, 0.12), 0 18px 40px rgba(0, 0, 0, 0.55); }
+      50% { box-shadow: 0 0 0 18px rgba(245, 193, 66, 0.22), 0 18px 40px rgba(0, 0, 0, 0.55); }
     }
     .bons-btn img { width: 100%; height: 100%; object-fit: cover; display: block; pointer-events: none; }
-    .bons-btn:hover { transform: scale(1.03); box-shadow: 0 0 0 14px rgba(245, 193, 66, 0.22), 0 18px 44px rgba(0, 0, 0, 0.55); }
-    .bons-btn:active { transform: scale(0.96); }
-    .bons-btn.pop { animation: pop 0.18s ease; }
+    .bons-btn:hover { transform: scale(1.04) rotate(-2deg); }
+    .bons-btn:active { transform: scale(0.95); }
+    .bons-btn.pop { animation: pop 0.18s ease, bonPulse 3s ease-in-out infinite; }
     @keyframes pop {
       0% { transform: scale(1); }
-      40% { transform: scale(0.92); }
-      70% { transform: scale(1.06); }
+      40% { transform: scale(0.9) rotate(3deg); }
+      70% { transform: scale(1.07) rotate(-2deg); }
       100% { transform: scale(1); }
     }
 
-    .click-hint { color: var(--cream-dim); font-weight: 700; font-size: 0.85rem; }
+    .click-hint { color: var(--cream-dim); font-weight: 700; font-size: 0.78rem; text-align: center; }
 
+    /* --- Effekte: fliegende Bons, Krümel, Zahlen --- */
+    .fly-bon {
+      position: fixed;
+      width: 46px;
+      height: 46px;
+      border-radius: 50%;
+      border: 2px solid var(--gold);
+      object-fit: cover;
+      pointer-events: none;
+      z-index: 80;
+    }
+    .crumb {
+      position: fixed;
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      pointer-events: none;
+      z-index: 81;
+    }
+    .nom {
+      position: fixed;
+      transform: translate(-50%, -50%);
+      font-family: var(--font-head);
+      color: var(--orange);
+      text-shadow: 1px 2px 0 rgba(0, 0, 0, 0.6);
+      pointer-events: none;
+      z-index: 82;
+      animation: nomPop 0.6s ease-out forwards;
+    }
+    @keyframes nomPop {
+      0% { opacity: 0; transform: translate(-50%, -50%) scale(0.4) rotate(-8deg); }
+      30% { opacity: 1; transform: translate(-50%, -60%) scale(1.2) rotate(4deg); }
+      100% { opacity: 0; transform: translate(-50%, -120%) scale(1) rotate(-4deg); }
+    }
     .float-num {
-      position: absolute;
+      position: fixed;
+      transform: translate(-50%, 0);
       font-family: var(--font-head);
       font-size: 1.4rem;
       color: var(--gold);
       text-shadow: 1px 2px 0 rgba(0, 0, 0, 0.6);
       pointer-events: none;
       animation: floatUp 1s ease-out forwards;
-      z-index: 10;
+      z-index: 79;
     }
     @keyframes floatUp {
       0% { opacity: 1; transform: translate(-50%, 0) scale(0.7); }
@@ -272,39 +340,50 @@
       100% { opacity: 0; transform: translate(-50%, -90px) scale(1); }
     }
 
-    /* ---------- Shop ---------- */
-    .shop { display: flex; flex-direction: column; gap: 12px; min-height: 0; }
+    /* ---------- Laden ---------- */
+    .shop {
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      background: var(--panel);
+      border: 2px solid var(--line);
+      border-radius: 16px;
+      box-shadow: var(--shadow);
+      padding: 12px;
+    }
 
-    .tabs { display: flex; gap: 8px; }
+    .tabs { display: flex; gap: 8px; flex: none; }
     .tab {
       flex: 1;
       background: var(--panel-2);
       color: var(--cream-dim);
       border: 2px solid var(--line);
       border-radius: 12px;
-      padding: 10px;
+      padding: 8px;
       font-family: var(--font-head);
-      font-size: 1rem;
+      font-size: 0.95rem;
       letter-spacing: 0.05em;
       transition: background 0.15s, color 0.15s;
     }
     .tab:hover { background: var(--line); color: var(--cream); }
     .tab[aria-selected="true"] { background: var(--red); border-color: var(--red); color: #fff; box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.25); }
 
-    .shop-list { display: flex; flex-direction: column; gap: 10px; overflow-y: auto; max-height: 70vh; padding-right: 4px; }
+    .shop-list { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 8px; overflow-y: auto; padding-right: 4px; }
 
     .shop-item {
       display: grid;
       grid-template-columns: 1fr auto;
-      gap: 4px 12px;
+      gap: 3px 12px;
       align-items: center;
       width: 100%;
       text-align: left;
       background: var(--panel-2);
       border: 2px solid var(--line);
       border-radius: 12px;
-      padding: 10px 14px;
+      padding: 9px 13px;
       color: var(--cream);
+      flex: none;
       transition: background 0.15s, border-color 0.15s, transform 0.05s;
     }
     .shop-item:hover:not(:disabled) { background: #553620; border-color: var(--orange); }
@@ -317,37 +396,36 @@
       100% { box-shadow: 0 0 0 16px rgba(245, 193, 66, 0); }
     }
 
-    .shop-item .name { font-weight: 800; font-size: 0.98rem; }
-    .shop-item .desc { grid-column: 1; font-size: 0.78rem; color: var(--cream-dim); font-weight: 600; }
-    .shop-item .cost { font-family: var(--font-head); color: var(--gold); font-size: 0.95rem; white-space: nowrap; text-align: right; }
+    .shop-item .name { font-weight: 800; font-size: 0.95rem; }
+    .shop-item .desc { grid-column: 1; font-size: 0.75rem; color: var(--cream-dim); font-weight: 600; }
+    .shop-item .cost { font-family: var(--font-head); color: var(--gold); font-size: 0.92rem; white-space: nowrap; text-align: right; }
     .shop-item .check { grid-row: 1 / span 2; grid-column: 2; font-size: 1.4rem; color: var(--green); text-align: right; }
 
     .gen-item { grid-template-columns: 1fr auto auto; }
-    .gen-item .name { grid-column: 1; }
-    .gen-item .desc { grid-column: 1; }
     .gen-item .cost { grid-column: 2; grid-row: 1; align-self: end; }
-    .gen-item .rate { grid-column: 2; grid-row: 2; font-size: 0.72rem; color: var(--cream-dim); font-weight: 700; text-align: right; white-space: nowrap; }
+    .gen-item .rate { grid-column: 2; grid-row: 2; font-size: 0.7rem; color: var(--cream-dim); font-weight: 700; text-align: right; white-space: nowrap; }
     .gen-item .owned {
       grid-column: 3;
       grid-row: 1 / span 2;
-      min-width: 38px;
+      min-width: 36px;
       font-family: var(--font-head);
-      font-size: 1.5rem;
+      font-size: 1.45rem;
       color: var(--orange);
       text-align: right;
     }
 
     /* ---------- Toast ---------- */
-    .toast-wrap { position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 8px; z-index: 100; pointer-events: none; }
+    .toast-wrap { position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 8px; z-index: 100; pointer-events: none; }
     .toast {
       background: var(--cream);
       color: #3a2310;
       font-weight: 800;
-      padding: 10px 18px;
+      padding: 9px 17px;
       border-radius: 999px;
       box-shadow: var(--shadow);
       animation: toastIn 0.25s ease, toastOut 0.3s ease 2.2s forwards;
       white-space: nowrap;
+      font-size: 0.9rem;
     }
     .toast.bad { background: var(--red); color: #fff; }
     .toast.good { background: var(--gold); }
@@ -368,7 +446,7 @@
     .modal {
       background: var(--panel);
       border: 3px solid var(--line);
-      border-radius: var(--radius);
+      border-radius: 16px;
       box-shadow: var(--shadow);
       padding: 24px;
       max-width: 420px;
@@ -376,7 +454,7 @@
       text-align: center;
       animation: toastIn 0.2s ease;
     }
-    .modal h2 { color: var(--gold); font-size: 1.4rem; margin-bottom: 10px; }
+    .modal h2 { font-family: var(--font-head); font-weight: 400; color: var(--gold); font-size: 1.4rem; margin-bottom: 10px; }
     .modal p { color: var(--cream-dim); font-weight: 600; margin-bottom: 20px; }
     .modal .actions { display: flex; gap: 10px; justify-content: center; }
     .btn-secondary {
@@ -392,85 +470,77 @@
     .btn-secondary:active { transform: translateY(1px); }
 
     /* ---------- Responsive ---------- */
-    @media (max-width: 1080px) {
-      .game { grid-template-columns: 1fr 1fr; }
-      .clicker-panel { grid-column: 1 / -1; grid-row: 1; min-height: 340px; }
-    }
-    @media (max-width: 680px) {
-      .game { grid-template-columns: 1fr; padding: 12px; gap: 12px; }
-      .clicker-panel { grid-column: 1; }
-      .topbar { padding: 10px 12px; }
-      .topstat { min-width: 110px; padding: 4px 10px; }
-      .shop-list { max-height: none; }
+    @media (max-width: 900px) {
+      .game { grid-template-columns: 1fr; grid-template-rows: minmax(0, 11fr) minmax(0, 9fr); gap: 10px; padding: 10px; }
+      .topbar h1 { font-size: 1rem; }
+      .chef-zone { flex-basis: 42%; }
+      .stat { min-width: 116px; }
+      .stat .value { font-size: 0.95rem; }
+      .bons-btn { width: min(26vh, 240px, 48vw); }
+      .bubble { min-height: 38px; padding: 6px 10px; }
+      .click-hint { display: none; }
     }
   </style>
 </head>
 <body>
   <header class="topbar">
     <h1>Chef's Schokoelsen Bons Feast</h1>
-    <div class="topstats">
-      <div class="topstat">
-        <div class="label">Gesamte Schokoelsen Bons</div>
-        <div class="value" id="top-total">0</div>
-      </div>
-      <div class="topstat">
-        <div class="label">Schokoelsen Bons pro Sekunde</div>
-        <div class="value" id="top-bps">0</div>
-      </div>
-      <button class="btn-sound" id="btn-sound" aria-pressed="false" title="Chef-Stimme an/aus">🔇 Stimme</button>
-      <button class="btn-reset" id="btn-reset">Zurücksetzen</button>
-    </div>
+    <button class="btn-sound" id="btn-sound" aria-pressed="false" title="Chef-Stimme an/aus">🔇 Stimme</button>
+    <button class="btn-reset" id="btn-reset">Zurücksetzen</button>
   </header>
 
   <main class="game">
-    <!-- Links: Chef -->
-    <section class="panel chef-panel" aria-label="Chef">
-      <div class="bubble" id="bubble" role="status" aria-live="polite"></div>
-      <div class="chef-figure" id="chef-figure">
-        <img src="/chef.png" alt="Chef, hungrig auf Schokoelsen Bons" />
+    <!-- Bühne: Chef + Schokoelsen Bons zusammen auf einem Screen -->
+    <section class="stage" aria-label="Spielbühne">
+      <div class="statsbar">
+        <div class="stat">
+          <div class="label">Gesamte Schokoelsen Bons</div>
+          <div class="value" id="stat-total">0</div>
+        </div>
+        <div class="stat">
+          <div class="label">Schokoelsen Bons pro Sekunde</div>
+          <div class="value" id="stat-bps">0</div>
+        </div>
+        <div class="stat">
+          <div class="label">Schokoelsen Bons pro Klick</div>
+          <div class="value" id="stat-bpc">1</div>
+        </div>
+        <div class="stat">
+          <div class="label">Klicks insgesamt</div>
+          <div class="value" id="stat-clicks">0</div>
+        </div>
       </div>
-      <div class="chef-caption">Chef will Schokoelsen Bons futtern!</div>
-      <div class="stats">
-        <div class="stat-row">
-          <span class="label">Gesamte Schokoelsen Bons</span>
-          <span class="value" id="stat-total">0</span>
+
+      <div class="arena">
+        <div class="chef-zone">
+          <div class="bubble" id="bubble" role="status" aria-live="polite"></div>
+          <div class="chef-figure" id="chef-figure">
+            <img src="/chef.png" alt="Chef, hungrig auf Schokoelsen Bons" id="chef-img" />
+          </div>
         </div>
-        <div class="stat-row">
-          <span class="label">Schokoelsen Bons pro Sekunde</span>
-          <span class="value" id="stat-bps">0</span>
-        </div>
-        <div class="stat-row">
-          <span class="label">Schokoelsen Bons pro Klick</span>
-          <span class="value" id="stat-bpc">1</span>
-        </div>
-        <div class="stat-row">
-          <span class="label">Klicks insgesamt</span>
-          <span class="value" id="stat-clicks">0</span>
+
+        <div class="bon-zone">
+          <div class="big-count">
+            <span id="big-total">0</span>
+            <small>Schokoelsen Bons</small>
+          </div>
+          <button class="bons-btn" id="bons-btn" aria-label="Schokoelsen Bons anklicken">
+            <img src="/bons.jpg" alt="Ein riesiges Schokoelsen Bon" />
+          </button>
+          <div class="click-hint">Klick die Schokoelsen Bons — Chef futtert jedes einzelne!</div>
         </div>
       </div>
     </section>
 
-    <!-- Mitte: Klick-Objekt -->
-    <section class="panel clicker-panel" aria-label="Schokoelsen Bons anklicken" id="clicker-panel">
-      <div class="big-count">
-        <span id="big-total">0</span>
-        <small>Schokoelsen Bons</small>
-      </div>
-      <button class="bons-btn" id="bons-btn" aria-label="Schokoelsen Bons anklicken">
-        <img src="/bons.jpg" alt="Ein riesiges Schokoelsen Bon" />
-      </button>
-      <div class="click-hint">Klick die Schokoelsen Bons — Chef hat Hunger!</div>
-    </section>
-
-    <!-- Rechts: Laden -->
-    <section class="panel shop" aria-label="Laden">
+    <!-- Laden -->
+    <aside class="shop" aria-label="Laden">
       <div class="tabs" role="tablist">
         <button class="tab" id="tab-gen" role="tab" aria-selected="true" aria-controls="list-gen">Generatoren</button>
         <button class="tab" id="tab-upg" role="tab" aria-selected="false" aria-controls="list-upg">Upgrades</button>
       </div>
       <div class="shop-list" id="list-gen" role="tabpanel" aria-labelledby="tab-gen"></div>
       <div class="shop-list" id="list-upg" role="tabpanel" aria-labelledby="tab-upg" hidden></div>
-    </section>
+    </aside>
   </main>
 
   <div class="toast-wrap" id="toast-wrap"></div>
@@ -528,6 +598,8 @@
       "Schokoelsen Bons sind Lebenselixier!",
       "Her mit dem süßen Zeug!",
     ];
+
+    const NOMS = ["Mampf!", "Nom!", "Mmmh!", "Lecker!", "Schmatz!"];
 
     const RARE_LINE = "Lak werd Mann du Hund";
 
@@ -597,18 +669,23 @@
 
     const $ = (id) => document.getElementById(id);
     const els = {
-      topTotal: $("top-total"), topBps: $("top-bps"),
       statTotal: $("stat-total"), statBps: $("stat-bps"),
       statBpc: $("stat-bpc"), statClicks: $("stat-clicks"),
       bigTotal: $("big-total"),
-      bonsBtn: $("bons-btn"), clickerPanel: $("clicker-panel"),
-      chefFigure: $("chef-figure"), bubble: $("bubble"),
+      bonsBtn: $("bons-btn"),
+      chefFigure: $("chef-figure"), chefImg: $("chef-img"), bubble: $("bubble"),
       listGen: $("list-gen"), listUpg: $("list-upg"),
       tabGen: $("tab-gen"), tabUpg: $("tab-upg"),
       toastWrap: $("toast-wrap"),
       modalReset: $("modal-reset"),
       btnSound: $("btn-sound"),
     };
+
+    /* Chefs Mund (relativ zum Chef-Bild) — Ziel der fliegenden Bons */
+    function mouthPos() {
+      const r = els.chefImg.getBoundingClientRect();
+      return { x: r.left + r.width * 0.5, y: r.top + r.height * 0.33 };
+    }
 
     /* =================== Laden aufbauen =================== */
 
@@ -710,7 +787,9 @@
       render();
     }
 
-    /* =================== Klicken =================== */
+    /* =================== Klicken: Bon fliegt in Chefs Mund =================== */
+
+    let flyingBons = 0;
 
     els.bonsBtn.addEventListener("click", (e) => {
       const gain = clickValue();
@@ -722,8 +801,12 @@
       void els.bonsBtn.offsetWidth;
       els.bonsBtn.classList.add("pop");
 
-      spawnFloat(e, "+" + fmt(gain));
-      chefReact("munch");
+      const rect = els.bonsBtn.getBoundingClientRect();
+      const sx = e.clientX || rect.left + rect.width / 2;
+      const sy = e.clientY || rect.top + rect.height / 2;
+
+      spawnFloat(sx, sy, "+" + fmt(gain));
+      flyBonToChef(sx, sy);
 
       if (Math.random() < 0.012) {
         say(RARE_LINE);
@@ -736,16 +819,80 @@
       render();
     });
 
-    function spawnFloat(e, text) {
-      const rect = els.clickerPanel.getBoundingClientRect();
+    function flyBonToChef(sx, sy) {
+      if (flyingBons >= 10) {  /* bei Klick-Spam Effekte begrenzen */
+        chefEats(mouthPos());
+        return;
+      }
+      flyingBons++;
+      const m = mouthPos();
+      const el = document.createElement("img");
+      el.src = "/bons.jpg";
+      el.className = "fly-bon";
+      el.style.left = sx - 23 + "px";
+      el.style.top = sy - 23 + "px";
+      document.body.appendChild(el);
+
+      const dx = m.x - sx;
+      const dy = m.y - sy;
+      const anim = el.animate(
+        [
+          { transform: "translate(0, 0) scale(1) rotate(0deg)", opacity: 1 },
+          { transform: `translate(${dx * 0.5}px, ${dy * 0.5 - 70}px) scale(0.9) rotate(180deg)`, opacity: 1, offset: 0.55 },
+          { transform: `translate(${dx}px, ${dy}px) scale(0.25) rotate(360deg)`, opacity: 0.9 },
+        ],
+        { duration: 480, easing: "cubic-bezier(0.45, 0.05, 0.55, 1)" }
+      );
+      anim.onfinish = () => {
+        el.remove();
+        flyingBons--;
+        chefEats(m);
+      };
+    }
+
+    function chefEats(m) {
+      chefReact("munch");
+      spawnCrumbs(m);
+      if (Math.random() < 0.35) {
+        const nom = document.createElement("span");
+        nom.className = "nom";
+        nom.textContent = pick(NOMS);
+        nom.style.left = m.x + "px";
+        nom.style.top = m.y - 24 + "px";
+        nom.style.fontSize = 0.9 + Math.random() * 0.5 + "rem";
+        document.body.appendChild(nom);
+        setTimeout(() => nom.remove(), 600);
+      }
+    }
+
+    const CRUMB_COLORS = ["#6b3f1f", "#8a5527", "#4a2c12", "#f5c142"];
+    function spawnCrumbs(m) {
+      for (let i = 0; i < 5; i++) {
+        const c = document.createElement("span");
+        c.className = "crumb";
+        c.style.background = pick(CRUMB_COLORS);
+        c.style.left = m.x - 4 + "px";
+        c.style.top = m.y + "px";
+        document.body.appendChild(c);
+        const ang = Math.random() * Math.PI;          /* nach unten/seitlich */
+        const dist = 24 + Math.random() * 36;
+        c.animate(
+          [
+            { transform: "translate(0,0) scale(1)", opacity: 1 },
+            { transform: `translate(${Math.cos(ang + Math.PI) * dist}px, ${Math.sin(ang) * dist + 28}px) scale(0.3)`, opacity: 0 },
+          ],
+          { duration: 450 + Math.random() * 250, easing: "ease-out" }
+        ).onfinish = () => c.remove();
+      }
+    }
+
+    function spawnFloat(x, y, text) {
       const el = document.createElement("span");
       el.className = "float-num";
       el.textContent = text;
-      const x = (e.clientX || rect.left + rect.width / 2) - rect.left;
-      const y = (e.clientY || rect.top + rect.height / 2) - rect.top;
       el.style.left = x + (Math.random() * 28 - 14) + "px";
-      el.style.top = y - 10 + "px";
-      els.clickerPanel.appendChild(el);
+      el.style.top = y - 14 + "px";
+      document.body.appendChild(el);
       setTimeout(() => el.remove(), 1000);
     }
 
@@ -874,7 +1021,6 @@
 
     function render() {
       const bps = totalBps();
-      els.topBps.textContent = fmt(bps);
       els.statBps.textContent = fmt(bps);
       els.statBpc.textContent = fmt(clickValue());
       els.statClicks.textContent = fmt(state.clicks);
@@ -899,7 +1045,6 @@
       displayed.bons += Math.abs(diff) < 0.01 ? diff : diff * Math.min(1, dt * 8);
 
       const txt = fmt(Math.floor(displayed.bons));
-      els.topTotal.textContent = txt;
       els.statTotal.textContent = txt;
       els.bigTotal.textContent = txt;
 
